@@ -4,6 +4,8 @@ import PetIllustration from './PetIllustration';
 import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
+import MediaPicker from './MediaPicker';
+import { IconHeart, IconShare } from './Icons';
 
 function timeAgo(isoLike) {
   const date = new Date(isoLike.replace(' ', 'T') + 'Z');
@@ -17,7 +19,7 @@ function timeAgo(isoLike) {
   return `hace ${diffD} d`;
 }
 
-export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
+export default function FeedView({ showToast, searchQuery = '', onViewPet, scrollContainerRef }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [caption, setCaption] = useState('');
@@ -27,7 +29,8 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
   const [shareModalPostId, setShareModalPostId] = useState(null);
   const [shareCaption, setShareCaption] = useState('');
   const [sharing, setSharing] = useState(false);
-  const fileInputRef = useRef(null);
+  const [composeHidden, setComposeHidden] = useState(false);
+  const lastScrollY = useRef(0);
 
   async function load() {
     setLoading(true);
@@ -43,9 +46,29 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
 
   useEffect(() => { load(); }, []);
 
-  function handlePickPhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Esconde el cuadro de "publicar" al bajar en el feed (para que no tape
+  // el contenido) y lo vuelve a mostrar al subir, como pidió el usuario.
+  useEffect(() => {
+    const el = scrollContainerRef?.current;
+    if (!el) return undefined;
+    lastScrollY.current = el.scrollTop;
+    function onScroll() {
+      const y = el.scrollTop;
+      const diff = y - lastScrollY.current;
+      if (y < 40) {
+        setComposeHidden(false);
+      } else if (diff > 6) {
+        setComposeHidden(true);
+      } else if (diff < -6) {
+        setComposeHidden(false);
+      }
+      lastScrollY.current = y;
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [scrollContainerRef]);
+
+  function handlePickPhoto(file) {
     if (!file.type.startsWith('image/')) {
       showToast('Ese archivo no es una imagen');
       return;
@@ -57,7 +80,6 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
   function clearPhoto() {
     setPhotoFile(null);
     setPhotoPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handlePost() {
@@ -140,7 +162,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
 
   return (
     <section>
-      <div className="compose">
+      <div className={`compose ${composeHidden ? 'hidden' : ''}`}>
         <div className="compose-row compose-row-text">
           <input
             type="text"
@@ -152,20 +174,13 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
           />
         </div>
         <div className="compose-row compose-row-actions">
-          <button
-            type="button"
-            className="photo-btn"
-            title="Agregar foto"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            📷
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
+          <MediaPicker
             accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handlePickPhoto}
+            onPick={handlePickPhoto}
+            cameraClassName="photo-btn"
+            galleryClassName="photo-btn gallery-btn"
+            cameraTitle="Tomar foto"
+            galleryTitle="Elegir de la galería"
           />
           <button disabled={!caption.trim() || posting} onClick={handlePost}>
             {posting ? 'Publicando…' : 'Publicar'}
@@ -232,7 +247,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
           )}
           <div className="post-actions">
             <button className={`action ${post.liked_by_me ? 'liked' : ''}`} onClick={() => handleLike(post.id)}>
-              {post.liked_by_me ? '❤️' : '🤍'} <span>{post.likes_count}</span>
+              <IconHeart filled={post.liked_by_me} size={18} /> <span>{post.likes_count}</span>
             </button>
             <CommentSection
               postId={post.id}
@@ -242,7 +257,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet }) {
               onCountChange={handleCommentCountChange}
             />
             <button className="action" onClick={() => { setShareModalPostId(post.id); setShareCaption(''); }}>
-              🔁 <span>Compartir</span>
+              <IconShare size={18} /> <span>Compartir</span>
             </button>
           </div>
         </div>

@@ -1,11 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import { IconCamera, IconGallery } from './Icons';
 
 export default function ProfileView({ onLogout, showToast }) {
   const [me, setMe] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => showToast('No se pudo cargar tu perfil'));
@@ -32,7 +34,7 @@ export default function ProfileView({ onLogout, showToast }) {
       showToast(err.message);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      e.target.value = '';
     }
   }
 
@@ -48,14 +50,31 @@ export default function ProfileView({ onLogout, showToast }) {
           <button
             type="button"
             className="profile-photo-btn"
-            title="Cambiar foto de perfil"
-            onClick={() => fileInputRef.current?.click()}
+            title="Tomar foto"
+            onClick={() => cameraInputRef.current?.click()}
             disabled={uploading}
           >
-            {uploading ? '…' : '📷'}
+            {uploading ? '…' : <IconCamera size={14} />}
+          </button>
+          <button
+            type="button"
+            className="profile-gallery-btn"
+            title="Elegir de la galería"
+            onClick={() => galleryInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <IconGallery size={12} />
           </button>
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={handlePickPhoto}
+          />
+          <input
+            ref={galleryInputRef}
             type="file"
             accept="image/*"
             style={{ display: 'none' }}

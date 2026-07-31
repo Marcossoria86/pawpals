@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import { IconHeart, IconComment, IconShare, IconPawSmall, IconCheck, IconClose } from './Icons';
+import { IconBell } from './NavIcons';
 
 function timeAgo(isoLike) {
   const date = new Date(isoLike.replace(' ', 'T') + 'Z');
@@ -29,13 +31,13 @@ function messageFor(n) {
 
 function iconFor(type) {
   switch (type) {
-    case 'like': return '❤️';
-    case 'comment': return '💬';
-    case 'share': return '🔁';
-    case 'playdate_request': return '🐾';
-    case 'playdate_accepted': return '✅';
-    case 'playdate_declined': return '🚫';
-    default: return '🔔';
+    case 'like': return <IconHeart filled size={16} />;
+    case 'comment': return <IconComment size={16} />;
+    case 'share': return <IconShare size={16} />;
+    case 'playdate_request': return <IconPawSmall size={17} />;
+    case 'playdate_accepted': return <IconCheck size={16} />;
+    case 'playdate_declined': return <IconClose size={16} />;
+    default: return <IconBell />;
   }
 }
 

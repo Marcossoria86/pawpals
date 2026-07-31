@@ -2,15 +2,28 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
+import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload } from './Icons';
 
 function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) {
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [showComments, setShowComments] = useState(false);
+
+  // Ponemos "muted" a mano sobre el elemento de video (no sólo como prop de
+  // React) porque algunos navegadores sólo respetan la propiedad real del
+  // DOM para permitir el autoplay — si sólo se manda como atributo JSX a
+  // veces el video queda "trabado" mostrando el primer cuadro como si fuera
+  // una foto y nunca arranca a reproducirse.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.muted = muted;
+  }, [muted]);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return undefined;
+    el.muted = muted;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
@@ -23,7 +36,15 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
     );
     observer.observe(el);
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function togglePlay() {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => {});
+    else el.pause();
+  }
 
   return (
     <div className="reel-item">
@@ -34,8 +55,16 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
         loop
         muted={muted}
         playsInline
-        onClick={() => setMuted((m) => !m)}
+        preload="auto"
+        onClick={togglePlay}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
       />
+      {!playing && (
+        <div className="reel-pause-overlay" onClick={togglePlay}>
+          <IconPlayPause playing={false} size={56} />
+        </div>
+      )}
       <div className="reel-overlay">
         <button className="reel-pet-link" onClick={() => onViewPet?.(reel.pet_id)}>
           <PetAvatar photoUrl={reel.pet_photo_url} species={reel.species} color={reel.color} size={36} />
@@ -45,15 +74,15 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
       </div>
       <div className="reel-side-actions">
         <button className={`reel-action ${reel.liked_by_me ? 'liked' : ''}`} onClick={() => onLike(reel.id)}>
-          <span>{reel.liked_by_me ? '❤️' : '🤍'}</span>
+          <IconHeart filled={reel.liked_by_me} size={24} />
           <b>{reel.likes_count}</b>
         </button>
         <button className="reel-action" onClick={() => setShowComments((v) => !v)}>
-          <span>💬</span>
+          <IconComment size={24} />
           <b>{reel.comments_count || 0}</b>
         </button>
         <button className="reel-action" onClick={() => setMuted((m) => !m)}>
-          <span>{muted ? '🔇' : '🔊'}</span>
+          <IconVolume muted={muted} size={24} />
         </button>
       </div>
       {showComments && (
@@ -140,7 +169,9 @@ export default function ReelsView({ showToast, onViewPet }) {
 
   return (
     <div className="reels-wrap">
-      <button className="reels-upload-fab" onClick={() => setComposerOpen(true)}>🎬 Subir</button>
+      <button className="reels-upload-fab" onClick={() => setComposerOpen(true)}>
+        <IconUpload size={15} /> <span>Subir</span>
+      </button>
 
       {loading && <div className="reels-loading-label">Cargando reels…</div>}
       {!loading && reels.length === 0 && (

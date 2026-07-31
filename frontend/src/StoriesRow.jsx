@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import { IconCamera, IconGallery, IconClose, IconPawSmall } from './Icons';
 
 // Fila de historias arriba del feed, estilo Facebook/Instagram: círculos con
 // las mascotas que publicaron algo en las últimas 24hs, la propia primero,
@@ -10,7 +11,8 @@ export default function StoriesRow({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [viewer, setViewer] = useState(null); // { groupIndex, storyIndex }
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const timerRef = useRef(null);
 
   async function load() {
@@ -39,7 +41,7 @@ export default function StoriesRow({ showToast }) {
       .catch((err) => showToast(err.message))
       .finally(() => {
         setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        e.target.value = '';
       });
   }
 
@@ -88,24 +90,51 @@ export default function StoriesRow({ showToast }) {
   if (loading) return null;
 
   const myGroupIndex = groups.findIndex((g) => g.is_mine);
+  const hasMyStory = myGroupIndex >= 0;
   const others = groups.filter((g) => !g.is_mine);
 
   return (
     <div className="stories-row">
-      <div className="story-circle add-story" onClick={() => fileInputRef.current?.click()}>
-        <div className="story-avatar-wrap add">
-          {myGroupIndex >= 0
-            ? (
-              <span onClick={(e) => { e.stopPropagation(); openViewer(myGroupIndex); }}>
-                <PetAvatar photoUrl={groups[myGroupIndex].photo_url} species={groups[myGroupIndex].species} color={groups[myGroupIndex].color} size={56} />
-              </span>
-            )
-            : <div className="story-avatar-empty">🐾</div>}
-          <span className="story-add-badge">{uploading ? '…' : '+'}</span>
+      <div className="story-circle add-story">
+        {/* El anillo de color (como en Instagram) sólo aparece cuando ya hay
+            una historia activa; si no hay, el anillo queda gris y tocar el
+            avatar abre la cámara para crear la primera. */}
+        <div className={`story-avatar-wrap ${hasMyStory ? '' : 'add'}`}>
+          {hasMyStory ? (
+            <span onClick={() => openViewer(myGroupIndex)}>
+              <PetAvatar photoUrl={groups[myGroupIndex].photo_url} species={groups[myGroupIndex].species} color={groups[myGroupIndex].color} size={56} />
+            </span>
+          ) : (
+            <div className="story-avatar-empty" onClick={() => cameraInputRef.current?.click()}>
+              <IconPawSmall size={26} />
+            </div>
+          )}
+          <span
+            className="story-add-badge"
+            onClick={(e) => { e.stopPropagation(); cameraInputRef.current?.click(); }}
+            title="Tomar foto o video"
+          >
+            {uploading ? '…' : <IconCamera size={15} />}
+          </span>
+          <span
+            className="story-gallery-badge"
+            onClick={(e) => { e.stopPropagation(); galleryInputRef.current?.click(); }}
+            title="Elegir de la galería"
+          >
+            <IconGallery size={12} />
+          </span>
         </div>
         <span className="story-label">Tu historia</span>
         <input
-          ref={fileInputRef}
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*,video/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={handlePickFile}
+        />
+        <input
+          ref={galleryInputRef}
           type="file"
           accept="image/*,video/*"
           style={{ display: 'none' }}
@@ -138,7 +167,7 @@ export default function StoriesRow({ showToast }) {
             <div className="story-viewer-head">
               <PetAvatar photoUrl={groups[viewer.groupIndex].photo_url} species={groups[viewer.groupIndex].species} color={groups[viewer.groupIndex].color} size={32} />
               <span>{groups[viewer.groupIndex].pet_name}</span>
-              <button className="story-close" onClick={closeViewer}>✕</button>
+              <button className="story-close" onClick={closeViewer}><IconClose size={18} /></button>
             </div>
             <div className="story-media">
               {groups[viewer.groupIndex].stories[viewer.storyIndex].media_type === 'video'

@@ -30,20 +30,31 @@ function makeStorage() {
   });
 }
 
-// Fotos de publicaciones y de perfil: solo imágenes, 5 MB.
+// Traduce los errores de multer (vienen en inglés, ej. "File too large") a
+// mensajes claros en español, con el límite real de cada tipo de subida.
+function uploadErrorMessage(err, maxMb) {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return `El archivo pesa demasiado (máximo ${maxMb} MB). Probá con uno más liviano o de menor calidad.`;
+  }
+  return (err && err.message) || 'No se pudo subir el archivo';
+}
+
+// Fotos de publicaciones y de perfil: solo imágenes, 8 MB.
+const IMAGE_MAX_MB = 8;
 const upload = multer({
   storage: makeStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: IMAGE_MAX_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Solo se permiten imágenes'));
     cb(null, true);
   }
 });
 
-// Historias: foto o video corto, 20 MB.
+// Historias: foto o video corto, 30 MB.
+const STORY_MAX_MB = 30;
 const uploadStory = multer({
   storage: makeStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: STORY_MAX_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
       return cb(new Error('Solo se permiten fotos o videos'));
@@ -52,11 +63,12 @@ const uploadStory = multer({
   }
 });
 
-// Reels: video real, 40 MB (sin transcodificar — el navegador reproduce el
+// Reels: video real, 75 MB (sin transcodificar — el navegador reproduce el
 // archivo tal cual se subió, por eso conviene pedir clips ya livianos).
+const REEL_MAX_MB = 75;
 const uploadReel = multer({
   storage: makeStorage(),
-  limits: { fileSize: 40 * 1024 * 1024 },
+  limits: { fileSize: REEL_MAX_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('video/')) return cb(new Error('Solo se permiten videos'));
     cb(null, true);
@@ -182,7 +194,7 @@ app.get('/api/me', requireAuth, (req, res) => {
 
 app.patch('/api/pets/me/photo', requireAuth, (req, res, next) => {
   upload.single('photo')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) return res.status(400).json({ error: uploadErrorMessage(err, IMAGE_MAX_MB) });
     next();
   });
 }, (req, res) => {
@@ -291,7 +303,7 @@ app.post('/api/posts/:id/toggle-comments', requireAuth, (req, res) => {
 
 app.post('/api/posts', requireAuth, (req, res, next) => {
   upload.single('photo')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) return res.status(400).json({ error: uploadErrorMessage(err, IMAGE_MAX_MB) });
     next();
   });
 }, (req, res) => {
@@ -506,7 +518,7 @@ app.patch('/api/playdates/:id', requireAuth, (req, res) => {
 
 app.post('/api/stories', requireAuth, (req, res, next) => {
   uploadStory.single('media')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) return res.status(400).json({ error: uploadErrorMessage(err, STORY_MAX_MB) });
     next();
   });
 }, (req, res) => {
@@ -564,7 +576,7 @@ app.get('/api/stories', requireAuth, (req, res) => {
 
 app.post('/api/reels', requireAuth, (req, res, next) => {
   uploadReel.single('video')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) return res.status(400).json({ error: uploadErrorMessage(err, REEL_MAX_MB) });
     next();
   });
 }, (req, res) => {

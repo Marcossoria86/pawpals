@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import { IconComment } from './Icons';
 
 export default function CommentSection({ postId, commentsCount, disabled, showToast, onCountChange }) {
   const [open, setOpen] = useState(false);
@@ -42,13 +43,13 @@ export default function CommentSection({ postId, commentsCount, disabled, showTo
   }
 
   if (disabled) {
-    return <div className="action action-disabled">💬 <span>Comentarios desactivados</span></div>;
+    return <div className="action action-disabled"><IconComment size={18} /> <span>Comentarios desactivados</span></div>;
   }
 
   return (
     <>
       <button className="action" onClick={toggleOpen}>
-        💬 <span>{commentsCount > 0 ? `${commentsCount} comentario${commentsCount === 1 ? '' : 's'}` : 'Comentar'}</span>
+        <IconComment size={18} /> <span>{commentsCount > 0 ? `${commentsCount} comentario${commentsCount === 1 ? '' : 's'}` : 'Comentar'}</span>
       </button>
 
       {open && (

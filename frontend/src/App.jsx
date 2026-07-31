@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { api } from './api';
 import AuthView from './AuthView';
@@ -11,6 +11,7 @@ import ReelsView from './ReelsView';
 import RequestsView from './RequestsView';
 import NotificationsView from './NotificationsView';
 import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile } from './NavIcons';
+import { IconSearch, IconClose, IconPawSmall } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
 // pendientes de aceptar/rechazar), Cerca de ti (ocupa el lugar que en
@@ -35,6 +36,7 @@ function App() {
   const [viewingPetId, setViewingPetId] = useState(null);
   const [me, setMe] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const mainRef = useRef(null);
 
   function toggleSearch() {
     setSearchOpen((prev) => {
@@ -49,6 +51,18 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+  }
+
+  // Tocar las patitas / "PawPals" del header vuelve al feed y lo desplaza
+  // hasta arriba del todo, como pidió el usuario.
+  function goHome() {
+    setViewingPetId(null);
+    setSearchOpen(false);
+    setSearchQuery('');
+    setTab('feed');
+    requestAnimationFrame(() => {
+      mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   }
 
   const showToast = useCallback((msg) => {
@@ -100,14 +114,16 @@ function App() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         ) : (
-          <div className="logo"><span>🐾</span> PawPals</div>
+          <button type="button" className="logo logo-btn" onClick={goHome} title="Ir al inicio">
+            <IconPawSmall size={20} /> PawPals
+          </button>
         )}
         {searchableTab && (
-          <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? '✕' : '🔍'}</div>
+          <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={16} /> : <IconSearch size={16} />}</div>
         )}
       </header>
 
-      <main className={tab === 'reels' ? 'no-pad' : ''}>
+      <main ref={mainRef} className={tab === 'reels' ? 'no-pad' : ''}>
         {viewingPetId ? (
           <PetProfileView
             petId={viewingPetId}
@@ -119,7 +135,7 @@ function App() {
             {tab === 'feed' && (
               <>
                 <StoriesRow showToast={showToast} />
-                <FeedView showToast={showToast} searchQuery={searchQuery} onViewPet={setViewingPetId} />
+                <FeedView showToast={showToast} searchQuery={searchQuery} onViewPet={setViewingPetId} scrollContainerRef={mainRef} />
               </>
             )}
             {tab === 'reels' && <ReelsView showToast={showToast} onViewPet={setViewingPetId} />}
