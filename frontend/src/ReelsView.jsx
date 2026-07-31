@@ -5,6 +5,7 @@ import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import MediaEditor from './MediaEditor';
 import OverlayLayer from './OverlayLayer';
+import ErrorBoundary from './ErrorBoundary';
 import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload } from './Icons';
 
 function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) {
@@ -257,16 +258,18 @@ export default function ReelsView({ showToast, onViewPet }) {
       )}
 
       {editorOpen && videoUrl && (
-        <MediaEditor
-          mediaUrl={videoUrl}
-          mediaType="video"
-          aspect={9 / 16}
-          allowMusic={false}
-          title="Agregá texto o stickers al reel"
-          confirmLabel="Listo"
-          onConfirm={handleEditorConfirm}
-          onCancel={() => setEditorOpen(false)}
-        />
+        <ErrorBoundary onReset={() => setEditorOpen(false)} message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
+          <MediaEditor
+            mediaUrl={videoUrl}
+            mediaType="video"
+            aspect={9 / 16}
+            allowMusic={false}
+            title="Agregá texto o stickers al reel"
+            confirmLabel="Listo"
+            onConfirm={handleEditorConfirm}
+            onCancel={() => setEditorOpen(false)}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

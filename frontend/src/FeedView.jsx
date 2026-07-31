@@ -7,6 +7,7 @@ import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import MediaPicker from './MediaPicker';
 import ImageCropper from './ImageCropper';
+import ErrorBoundary from './ErrorBoundary';
 import { IconHeart, IconShare } from './Icons';
 
 function timeAgo(isoLike) {
@@ -298,13 +299,15 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
       )}
 
       {cropFile && (
-        <ImageCropper
-          file={cropFile}
-          aspect={4 / 3}
-          title="Acomodá la foto de tu publicación"
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
-        />
+        <ErrorBoundary onReset={() => setCropFile(null)}>
+          <ImageCropper
+            file={cropFile}
+            aspect={4 / 3}
+            title="Acomodá la foto de tu publicación"
+            onConfirm={handleCropConfirm}
+            onCancel={() => setCropFile(null)}
+          />
+        </ErrorBoundary>
       )}
     </section>
   );

@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
+import ErrorBoundary from './ErrorBoundary';
 import FollowListModal from './FollowListModal';
 import { IconCamera, IconGallery } from './Icons';
 
@@ -108,14 +109,16 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
 
       {cropFile && (
-        <ImageCropper
-          file={cropFile}
-          aspect={1}
-          shape="circle"
-          title="Acomodá tu foto de perfil"
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
-        />
+        <ErrorBoundary onReset={() => setCropFile(null)}>
+          <ImageCropper
+            file={cropFile}
+            aspect={1}
+            shape="circle"
+            title="Acomodá tu foto de perfil"
+            onConfirm={handleCropConfirm}
+            onCancel={() => setCropFile(null)}
+          />
+        </ErrorBoundary>
       )}
 
       {listModal && (
