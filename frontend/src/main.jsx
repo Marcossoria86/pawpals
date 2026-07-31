@@ -23,3 +23,13 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Registra el service worker que permite instalar PawPals como app (PWA):
+// ícono propio en la pantalla de inicio, abre en pantalla completa. Sólo en
+// producción (build), no en `npm run dev`, para no complicar el desarrollo
+// con caché mientras se está programando.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

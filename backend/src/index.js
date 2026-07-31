@@ -10,7 +10,17 @@ const { signToken, requireAuth } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// CLIENT_ORIGIN puede tener varios orígenes separados por coma (ej. la web
+// en Render + la app nativa). Además de lo que esté configurado, siempre
+// permitimos los orígenes típicos de la app empaquetada con Capacitor
+// (iOS/Android): ahí el navegador interno no manda el dominio real, sino
+// uno de estos esquemas fijos.
+const CAPACITOR_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost'];
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+  .concat(CAPACITOR_ORIGINS);
 
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -76,7 +86,15 @@ const uploadReel = multer({
 });
 
 app.use(express.json());
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+app.use(cors({
+  origin: (origin, cb) => {
+    // Pedidos sin "origin" (ej. apps nativas en algunos casos, o curl) los
+    // dejamos pasar; si viene un origin, tiene que estar en la lista.
+    if (!origin || CLIENT_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error('No permitido por CORS'));
+  },
+  credentials: true
+}));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 function haversineKm(lat1, lng1, lat2, lng2) {
