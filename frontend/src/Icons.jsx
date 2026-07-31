@@ -206,6 +206,15 @@ export function IconBlock({ size = 18 }) {
   );
 }
 
+export function IconRotate({ size = 16 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M4.5 12a7.5 7.5 0 1 1 2.4 5.5" />
+      <path d="M4.2 16.5 4.5 12l4.4 1" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconLocation({ size = 18 }) {
   return (
     <svg {...COMMON} width={size} height={size} aria-hidden="true">

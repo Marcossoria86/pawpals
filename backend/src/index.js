@@ -116,6 +116,7 @@ function sanitizeOverlays(raw) {
     xPct: Math.max(0, Math.min(100, Number(o.xPct) || 50)),
     yPct: Math.max(0, Math.min(100, Number(o.yPct) || 50)),
     scale: Math.max(0.4, Math.min(3, Number(o.scale) || 1)),
+    rotation: Number.isFinite(Number(o.rotation)) ? Math.max(-180, Math.min(180, Number(o.rotation))) : 0,
     color: typeof o.color === 'string' ? o.color.slice(0, 20) : undefined
   })).filter((o) => o.content);
 }
@@ -747,7 +748,12 @@ app.post('/api/posts', requireAuth, writeLimiter, (req, res, next) => {
   });
 }, (req, res) => {
   const { caption } = req.body;
-  if (!caption || !caption.trim()) return res.status(400).json({ error: 'La publicación no puede estar vacía' });
+  // El texto ya no es obligatorio (antes sí) — alcanza con subir una foto
+  // sola. Lo único que no se permite es publicar sin texto Y sin foto.
+  const trimmedCaption = (caption || '').trim();
+  if (!trimmedCaption && !req.file) {
+    return res.status(400).json({ error: 'La publicación no puede estar vacía — agregá una foto o un texto' });
+  }
   const pet = getPetByOwner(req.userId);
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
@@ -755,7 +761,7 @@ app.post('/api/posts', requireAuth, writeLimiter, (req, res, next) => {
 
   const info = db
     .prepare('INSERT INTO posts (pet_id, caption, media, image_path) VALUES (?, ?, ?, ?)')
-    .run(pet.id, caption.trim().slice(0, 280), '📸', imagePath);
+    .run(pet.id, trimmedCaption.slice(0, 280), '📸', imagePath);
 
   res.json({ id: info.lastInsertRowid, image_url: absoluteUploadUrl(req, imagePath) });
 });

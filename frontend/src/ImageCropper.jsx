@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose } from './Icons';
+import { IconClose, IconRotate } from './Icons';
 
 // Modal para "acomodar" una foto antes de subirla: se ve el marco tal cual
 // va a quedar (cuadrado para el perfil o publicaciones, vertical para
@@ -21,6 +21,55 @@ function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+// Cuánto hay que agrandar la foto (además del zoom que ya eligió la
+// persona) para que, al girarla "rotationDeg" grados, siga tapando todo el
+// marco sin dejar huecos transparentes en las esquinas — el mismo problema
+// que resolver "¿cuánto tengo que acercar la cámara para que, aunque gire
+// el encuadre, no se vea nada fuera de la foto?".
+//
+// Se calcula pasando las 4 esquinas del marco a las coordenadas propias de
+// la foto (sin girar), tomando como centro el punto real donde está
+// centrada la foto ahora mismo (ex, ey) — no el centro del marco — porque
+// si la foto está arrastrada hacia un costado, la esquina más lejana del
+// marco necesita más margen que si estuviera centrada. Con esas 4 esquinas
+// ya "desgiradas", el tamaño mínimo que necesita la foto para seguir
+// cubriéndolas es el doble del valor absoluto más grande en cada eje.
+function getRotationExtraScale(rotationDeg, dW, dH, containerW, containerH, ex, ey) {
+  if (!rotationDeg || !dW || !dH) return 1;
+  const theta = (rotationDeg * Math.PI) / 180;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+  const corners = [
+    [-containerW / 2 - ex, -containerH / 2 - ey],
+    [containerW / 2 - ex, -containerH / 2 - ey],
+    [-containerW / 2 - ex, containerH / 2 - ey],
+    [containerW / 2 - ex, containerH / 2 - ey]
+  ];
+  let maxAbsX = 0;
+  let maxAbsY = 0;
+  for (const [cx, cy] of corners) {
+    const px = cx * cosT + cy * sinT;
+    const py = -cx * sinT + cy * cosT;
+    maxAbsX = Math.max(maxAbsX, Math.abs(px));
+    maxAbsY = Math.max(maxAbsY, Math.abs(py));
+  }
+  const scaleX = (maxAbsX * 2) / dW;
+  const scaleY = (maxAbsY * 2) / dH;
+  return Math.max(scaleX, scaleY, 1);
+}
+
+// Ángulos "derechos" a los que conviene que el giro se pegue solo (como el
+// imán al centrar un ícono en apps de diseño) — así es fácil volver a dejar
+// la foto perfectamente alineada después de haber probado a girarla.
+const ROTATION_SNAP_TARGETS = [-180, -90, 0, 90, 180];
+const ROTATION_SNAP_THRESHOLD = 3;
+function snapRotation(deg) {
+  for (const target of ROTATION_SNAP_TARGETS) {
+    if (Math.abs(deg - target) < ROTATION_SNAP_THRESHOLD) return target;
+  }
+  return deg;
+}
+
 export default function ImageCropper({
   file,
   aspect = 1,
@@ -34,6 +83,8 @@ export default function ImageCropper({
   const [natural, setNatural] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
+  const [straightening, setStraightening] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 300, height: 300 / aspect });
   const [saving, setSaving] = useState(false);
   const containerRef = useRef(null);
@@ -68,6 +119,14 @@ export default function ImageCropper({
   }
 
   const displayed = computeDisplayed(zoom, containerSize);
+  // Centro actual de la foto respecto del centro del marco (0,0 = está
+  // perfectamente centrada) — lo necesita getRotationExtraScale para saber
+  // cuánto agrandar cuando además está arrastrada hacia un costado.
+  const centerEx = offset.x + displayed.w / 2 - containerSize.width / 2;
+  const centerEy = offset.y + displayed.h / 2 - containerSize.height / 2;
+  const rotationExtraScale = getRotationExtraScale(
+    rotation, displayed.w, displayed.h, containerSize.width, containerSize.height, centerEx, centerEy
+  );
 
   function clamp(o, dW, dH) {
     const minX = Math.min(0, containerSize.width - dW);
@@ -169,13 +228,29 @@ export default function ImageCropper({
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
     const canvasScale = targetW / containerSize.width;
-    ctx.drawImage(
-      imgElRef.current,
-      offset.x * canvasScale,
-      offset.y * canvasScale,
-      displayed.w * canvasScale,
-      displayed.h * canvasScale
-    );
+    if (!rotation) {
+      ctx.drawImage(
+        imgElRef.current,
+        offset.x * canvasScale,
+        offset.y * canvasScale,
+        displayed.w * canvasScale,
+        displayed.h * canvasScale
+      );
+    } else {
+      // Mismo razonamiento que el transform CSS de más abajo (ver el estilo
+      // inline de .cropper-img): centramos, giramos, agrandamos lo que haga
+      // falta para tapar el marco, y recién ahí dibujamos la foto — así el
+      // archivo final queda exactamente igual a lo que se veía en la vista
+      // previa.
+      const cx = (offset.x + displayed.w / 2) * canvasScale;
+      const cy = (offset.y + displayed.h / 2) * canvasScale;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.scale(rotationExtraScale * canvasScale, rotationExtraScale * canvasScale);
+      ctx.drawImage(imgElRef.current, -displayed.w / 2, -displayed.h / 2, displayed.w, displayed.h);
+      ctx.restore();
+    }
     canvas.toBlob((blob) => {
       setSaving(false);
       if (!blob) return;
@@ -215,12 +290,48 @@ export default function ImageCropper({
               style={{
                 width: displayed.w || '100%',
                 height: displayed.h || '100%',
-                transform: `translate(${offset.x}px, ${offset.y}px)`
+                transformOrigin: '0 0',
+                transform: rotation
+                  ? `translate(${offset.x + displayed.w / 2}px, ${offset.y + displayed.h / 2}px) rotate(${rotation}deg) scale(${rotationExtraScale}) translate(${-displayed.w / 2}px, ${-displayed.h / 2}px)`
+                  : `translate(${offset.x}px, ${offset.y}px)`
               }}
             />
           )}
+          {/* Grilla de alineación (tipo "enderezar" de Instagram): sólo se ve
+              mientras se está arrastrando el control de girar, para ayudar a
+              volver a dejar la foto derecha sin que quede permanentemente en
+              el medio tapando la imagen. */}
+          {straightening && (
+            <div className="cropper-grid" aria-hidden="true">
+              <span /><span /><span /><span />
+            </div>
+          )}
         </div>
-        <div className="cropper-hint">Arrastrá para mover · Pellizcá para hacer zoom</div>
+
+        <div className="cropper-rotate-row">
+          <IconRotate size={15} />
+          <input
+            type="range"
+            min="-180"
+            max="180"
+            step="1"
+            value={rotation}
+            onPointerDown={() => setStraightening(true)}
+            onPointerUp={() => setStraightening(false)}
+            onChange={(e) => setRotation(snapRotation(Number(e.target.value)))}
+          />
+          <button
+            type="button"
+            className="cropper-rotate-reset"
+            onClick={() => setRotation(0)}
+            aria-label="Dejar la foto derecha"
+            title="Dejar la foto derecha"
+          >
+            {Math.round(rotation)}°
+          </button>
+        </div>
+
+        <div className="cropper-hint">Arrastrá para mover · Pellizcá para hacer zoom · Girá para enderezar</div>
         <div className="modal-actions">
           <button className="modal-btn-secondary" onClick={onCancel} disabled={saving}>Cancelar</button>
           <button className="modal-btn-primary" onClick={handleConfirm} disabled={!natural || saving}>

@@ -97,7 +97,9 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
   }
 
   async function handlePost() {
-    if (!caption.trim()) return;
+    // El texto ya no es obligatorio — alcanza con tener foto o texto (o
+    // ambos), pero no publicar completamente vacío.
+    if (!caption.trim() && !photoFile) return;
     setPosting(true);
     try {
       await api.createPost({ caption, photoFile });
@@ -196,7 +198,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
             cameraTitle="Tomar foto"
             galleryTitle="Elegir de la galería"
           />
-          <button disabled={!caption.trim() || posting} onClick={handlePost}>
+          <button disabled={(!caption.trim() && !photoFile) || posting} onClick={handlePost}>
             {posting ? 'Publicando…' : 'Publicar'}
           </button>
         </div>

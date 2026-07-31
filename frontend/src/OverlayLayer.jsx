@@ -15,6 +15,10 @@ export default function OverlayLayer({ overlays }) {
           style={{
             left: `${o.xPct}%`,
             top: `${o.yPct}%`,
+            // Repetimos el translate(-50%,-50%) de .overlay-item acá porque
+            // el style inline pisa el transform de la clase CSS (ver mismo
+            // comentario en MediaEditor.jsx).
+            transform: `translate(-50%, -50%) rotate(${o.rotation || 0}deg)`,
             fontSize: o.type === 'text' ? `${22 * (o.scale || 1)}px` : `${34 * (o.scale || 1)}px`,
             color: o.type === 'text' ? (o.color || '#ffffff') : undefined
           }}

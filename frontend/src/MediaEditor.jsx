@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause } from './Icons';
+import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause, IconRotate } from './Icons';
 
 const TEXT_COLORS = ['#ffffff', '#2b2320', '#c9683f', '#5b8c6e', '#e0b23c', '#7a5fb0'];
 const EMOJIS = ['🐾', '❤️', '😂', '😍', '🥰', '🎉', '🔥', '⭐', '😺', '🐶', '🦴', '🎾', '✨', '👀', '😴', '🥺', '💛', '🐦', '🐰', '🌈', '☀️', '🌙', '💯', '👏'];
@@ -192,6 +192,11 @@ export default function MediaEditor({
               style={{
                 left: `${o.xPct}%`,
                 top: `${o.yPct}%`,
+                // La clase .overlay-item ya centra el texto/sticker con
+                // translate(-50%,-50%) — como acá lo fijamos por style
+                // (para poder sumarle la rotación), hay que repetir ese
+                // translate acá también, si no el style inline lo pisaría.
+                transform: `translate(-50%, -50%) rotate(${o.rotation || 0}deg)`,
                 fontSize: o.type === 'text' ? `${22 * o.scale}px` : `${34 * o.scale}px`,
                 color: o.type === 'text' ? o.color : undefined
               }}
@@ -203,17 +208,36 @@ export default function MediaEditor({
         </div>
 
         {selected && (
-          <div className="editor-selected-row">
-            <span className="cropper-zoom-label">Tamaño</span>
-            <input
-              type="range" min="0.5" max="2.5" step="0.05"
-              value={selected.scale}
-              onChange={(e) => updateSelected({ scale: Number(e.target.value) })}
-            />
-            <button type="button" className="editor-delete-btn" onClick={deleteSelected} aria-label="Eliminar">
-              <IconTrash size={17} />
-            </button>
-          </div>
+          <>
+            <div className="editor-selected-row">
+              <span className="cropper-zoom-label">Tamaño</span>
+              <input
+                type="range" min="0.5" max="2.5" step="0.05"
+                value={selected.scale}
+                onChange={(e) => updateSelected({ scale: Number(e.target.value) })}
+              />
+              <button type="button" className="editor-delete-btn" onClick={deleteSelected} aria-label="Eliminar">
+                <IconTrash size={17} />
+              </button>
+            </div>
+            <div className="editor-selected-row">
+              <span className="cropper-zoom-label">Girar</span>
+              <input
+                type="range" min="-180" max="180" step="1"
+                value={selected.rotation || 0}
+                onChange={(e) => updateSelected({ rotation: Number(e.target.value) })}
+              />
+              <button
+                type="button"
+                className="editor-delete-btn"
+                onClick={() => updateSelected({ rotation: 0 })}
+                aria-label="Restablecer giro"
+                title="Restablecer giro"
+              >
+                <IconRotate size={15} />
+              </button>
+            </div>
+          </>
         )}
 
         <div className="editor-toolbar">
