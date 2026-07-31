@@ -27,14 +27,17 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const VIDEO_EXT = ['.mp4', '.mov', '.webm', '.m4v'];
+const AUDIO_EXT = ['.mp3', '.m4a', '.wav', '.aac', '.ogg', '.oga'];
 
 function makeStorage() {
   return multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOADS_DIR),
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
-      const allExt = [...IMAGE_EXT, ...VIDEO_EXT];
-      const safeExt = allExt.includes(ext) ? ext : (file.mimetype.startsWith('video/') ? '.mp4' : '.jpg');
+      const allExt = [...IMAGE_EXT, ...VIDEO_EXT, ...AUDIO_EXT];
+      const safeExt = allExt.includes(ext)
+        ? ext
+        : file.mimetype.startsWith('video/') ? '.mp4' : file.mimetype.startsWith('audio/') ? '.mp3' : '.jpg';
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
     }
   });
@@ -60,12 +63,20 @@ const upload = multer({
   }
 });
 
-// Historias: foto o video corto, 30 MB.
+// Historias: foto o video corto, 30 MB, más opcionalmente un audio propio
+// (campo "music") de hasta 30 MB también — multer no distingue el límite de
+// tamaño por campo cuando se usan varios en el mismo pedido, así que
+// validamos el tamaño del audio a mano más abajo con un límite más chico.
 const STORY_MAX_MB = 30;
+const STORY_MUSIC_MAX_MB = 15;
 const uploadStory = multer({
   storage: makeStorage(),
   limits: { fileSize: STORY_MAX_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'music') {
+      if (!file.mimetype.startsWith('audio/')) return cb(new Error('El archivo de música tiene que ser un audio'));
+      return cb(null, true);
+    }
     if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
       return cb(new Error('Solo se permiten fotos o videos'));
     }
@@ -75,10 +86,6 @@ const uploadStory = multer({
 
 // Reels: video real, 75 MB (sin transcodificar — el navegador reproduce el
 // archivo tal cual se subió, por eso conviene pedir clips ya livianos).
-// Catálogo de música para historias — tiene que ser exactamente uno de
-// estos keys (espejados en frontend/src/musicCatalog.js); cualquier otra
-// cosa que venga en el pedido se ignora.
-const MUSIC_KEYS = ['alegre', 'relax', 'fiesta', 'tierno', 'energico'];
 
 // Valida y devuelve una lista de overlays (texto/stickers) lista para
 // guardar como JSON: nunca confiamos en lo que manda el cliente sin
@@ -643,29 +650,36 @@ app.patch('/api/playdates/:id', requireAuth, (req, res) => {
 // ---------- HISTORIAS ----------
 
 app.post('/api/stories', requireAuth, (req, res, next) => {
-  uploadStory.single('media')(req, res, (err) => {
+  uploadStory.fields([{ name: 'media', maxCount: 1 }, { name: 'music', maxCount: 1 }])(req, res, (err) => {
     if (err) return res.status(400).json({ error: uploadErrorMessage(err, STORY_MAX_MB) });
     next();
   });
 }, (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No se recibió ninguna foto o video' });
+  const mediaFile = req.files?.media?.[0];
+  let musicFile = req.files?.music?.[0];
+  if (!mediaFile) return res.status(400).json({ error: 'No se recibió ninguna foto o video' });
+  if (musicFile && musicFile.size > STORY_MUSIC_MAX_MB * 1024 * 1024) {
+    fs.unlink(path.join(UPLOADS_DIR, musicFile.filename), () => {});
+    return res.status(400).json({ error: `El audio pesa demasiado (máximo ${STORY_MUSIC_MAX_MB} MB).` });
+  }
   const pet = getPetByOwner(req.userId);
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
-  const mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
-  // La música es sólo para historias de foto — un video de historia ya trae
-  // su propio audio.
-  const musicKey = mediaType === 'image' && MUSIC_KEYS.includes(req.body.music_key) ? req.body.music_key : null;
+  const mediaType = mediaFile.mimetype.startsWith('video/') ? 'video' : 'image';
+  // Silenciar el audio original sólo tiene sentido para un video (una foto
+  // no tiene audio propio).
+  const muteOriginal = mediaType === 'video' && req.body.mute_original === '1' ? 1 : 0;
   const overlays = sanitizeOverlays(req.body.overlays);
   const info = db
-    .prepare('INSERT INTO stories (pet_id, media_path, media_type, music_key, overlays) VALUES (?, ?, ?, ?, ?)')
-    .run(pet.id, req.file.filename, mediaType, musicKey, overlays.length ? JSON.stringify(overlays) : null);
+    .prepare('INSERT INTO stories (pet_id, media_path, media_type, music_path, mute_original, overlays) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(pet.id, mediaFile.filename, mediaType, musicFile ? musicFile.filename : null, muteOriginal, overlays.length ? JSON.stringify(overlays) : null);
 
   res.json({
     id: info.lastInsertRowid,
-    media_url: absoluteUploadUrl(req, req.file.filename),
+    media_url: absoluteUploadUrl(req, mediaFile.filename),
     media_type: mediaType,
-    music_key: musicKey,
+    music_url: musicFile ? absoluteUploadUrl(req, musicFile.filename) : null,
+    mute_original: !!muteOriginal,
     overlays
   });
 });
@@ -673,7 +687,7 @@ app.post('/api/stories', requireAuth, (req, res, next) => {
 app.get('/api/stories', requireAuth, (req, res) => {
   const rows = db
     .prepare(
-      `SELECT stories.id, stories.media_path, stories.media_type, stories.music_key, stories.overlays, stories.created_at,
+      `SELECT stories.id, stories.media_path, stories.media_type, stories.music_path, stories.mute_original, stories.overlays, stories.created_at,
               pets.id AS pet_id, pets.name AS pet_name, pets.species, pets.color, pets.photo_path, pets.owner_id
        FROM stories
        JOIN pets ON pets.id = stories.pet_id
@@ -701,10 +715,10 @@ app.get('/api/stories', requireAuth, (req, res) => {
       id: r.id,
       media_url: absoluteUploadUrl(req, r.media_path),
       media_type: r.media_type,
-      // El archivo de música vive como asset estático del FRONTEND
-      // (public/music/*.mp3, ver frontend/src/musicCatalog.js) — el backend
-      // sólo guarda y devuelve el "key" (ej. "alegre"), no una URL.
-      music_key: r.music_key || null,
+      // Audio propio que subió el dueño de la mascota (no una librería
+      // nuestra): vive en /uploads como cualquier otro archivo subido.
+      music_url: r.music_path ? absoluteUploadUrl(req, r.music_path) : null,
+      mute_original: !!r.mute_original,
       overlays,
       created_at: r.created_at
     });

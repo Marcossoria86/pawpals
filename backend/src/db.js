@@ -124,8 +124,10 @@ function ensureColumn(table, column, definition) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
-ensureColumn('stories', 'music_key', 'TEXT');
+ensureColumn('stories', 'music_key', 'TEXT'); // legado, ya no se escribe (ver music_path)
 ensureColumn('stories', 'overlays', 'TEXT');
+ensureColumn('stories', 'music_path', 'TEXT');
+ensureColumn('stories', 'mute_original', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('posts', 'overlays', 'TEXT');
 
 function seedIfEmpty() {

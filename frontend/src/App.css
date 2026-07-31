@@ -141,7 +141,7 @@ main{
   border:1px solid var(--line);
   font-size:14px;
   outline:none;
-  background:#fdfcfa;
+  background:var(--input-bg);
 }
 .field input:focus{
   border-color: var(--brand);
@@ -167,7 +167,7 @@ main{
   padding:8px 4px 6px;
   border-radius:12px;
   border:2px solid var(--line);
-  background:#fdfcfa;
+  background:var(--input-bg);
   cursor:pointer;
 }
 .species-option span{
@@ -211,8 +211,8 @@ main{
   padding:0;
 }
 .error-box{
-  background:#fbe9e4;
-  color:#a3402a;
+  background:var(--danger-soft);
+  color:var(--danger);
   font-size:13px;
   padding:8px 12px;
   border-radius:10px;
@@ -399,7 +399,7 @@ main{
   line-height:1;
 }
 .post-menu-btn:hover{
-  background:#f4f1ea;
+  background:var(--chip-bg);
 }
 .post-menu-dropdown{
   position:absolute;
@@ -425,10 +425,10 @@ main{
   cursor:pointer;
 }
 .post-menu-dropdown button:hover{
-  background:#f4f1ea;
+  background:var(--chip-bg);
 }
 .post-menu-dropdown button.danger{
-  color:#a3402a;
+  color:var(--danger);
 }
 .avatar{
   width:40px;height:40px;
@@ -498,7 +498,7 @@ main{
   align-items:flex-start;
 }
 .comment-bubble{
-  background:#f4f1ea;
+  background:var(--chip-bg);
   border-radius:12px;
   padding:6px 10px;
   font-size:13px;
@@ -993,6 +993,10 @@ main.no-pad{ padding:0; }
   cursor:pointer;
   z-index:2;
 }
+/* Cuando conviven el botón de silenciar del video y el de la música propia
+   (el video conserva su audio original Y además tiene música), corremos
+   este segundo botón para que no se pisen. */
+.story-mute-btn.story-music-btn.offset{ right:54px; }
 .story-media img, .story-media video{
   width:100%;
   height:100%;
@@ -1184,10 +1188,16 @@ main.no-pad{ padding:0; }
   font-size:14px;
   outline:none;
   margin-bottom:14px;
-  background:#fdfcfa;
+  background:var(--input-bg);
   color:var(--ink);
 }
 .modal-text-input:focus{ border-color:var(--brand); }
+.error-boundary-text{
+  font-size:13.5px;
+  color:var(--ink-soft);
+  line-height:1.5;
+  margin:0 0 4px;
+}
 .modal-actions{
   display:flex;
   justify-content:flex-end;
@@ -1221,7 +1231,7 @@ main.no-pad{ padding:0; }
   border-radius:12px;
   margin:0 14px 12px;
   overflow:hidden;
-  background:#fbf9f5;
+  background:var(--surface-alt);
 }
 .shared-embed-head{
   display:flex;
@@ -1417,9 +1427,9 @@ main.no-pad{ padding:0; }
   cursor:pointer;
 }
 .request-accept{ background:var(--brand); color:#fff; }
-.request-decline{ background:#f4f1ea; color:var(--ink-soft); }
+.request-decline{ background:var(--chip-bg); color:var(--ink-soft); }
 .pill-accepted{ background: var(--brand-soft); color:var(--brand); }
-.pill-declined{ background:#fbe9e4; color:#a3402a; }
+.pill-declined{ background:var(--danger-soft); color:var(--danger); }
 
 /* ---------- Notificaciones ---------- */
 .notif-row{
@@ -1552,9 +1562,20 @@ main.no-pad{ padding:0; }
   padding:4px 6px;
   border-radius:6px;
 }
-.editor-overlay-item.selected{
+/* Al texto seleccionado sí le dejamos un borde punteado (ayuda a ver dónde
+   termina la caja de texto). A un sticker (un emoji) un recuadro se ve raro
+   — en cambio le damos un resplandor suave y circular, más acorde a su
+   forma, para que se note que está seleccionado sin la "caja". */
+.editor-overlay-item.overlay-text.selected{
   outline:2px dashed rgba(255,255,255,0.85);
   outline-offset:2px;
+  border-radius:6px;
+}
+.editor-overlay-item.overlay-sticker.selected{
+  text-shadow:
+    0 0 8px rgba(255,255,255,0.9),
+    0 0 8px rgba(255,255,255,0.9),
+    0 2px 10px rgba(0,0,0,0.35);
 }
 .editor-selected-row{
   display:flex;
@@ -1684,4 +1705,28 @@ main.no-pad{ padding:0; }
   border-radius:10px;
   cursor:pointer;
   margin-bottom:10px;
+}
+.editor-pick-music-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  margin-bottom:0;
+}
+.editor-mute-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12.5px;
+  font-weight:600;
+  color:var(--ink);
+  margin-bottom:12px;
+  cursor:pointer;
+}
+.editor-mute-row input{ flex-shrink:0; }
+.editor-music-disclaimer{
+  font-size:11px;
+  color:var(--ink-soft);
+  line-height:1.4;
+  margin:10px 0 0;
 }

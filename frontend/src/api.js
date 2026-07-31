@@ -88,11 +88,12 @@ export const api = {
   petFollowing: (petId) => request(`/api/pets/${petId}/following`),
 
   stories: () => request('/api/stories'),
-  createStory: (mediaFile, { overlays, musicKey } = {}) => {
+  createStory: (mediaFile, { overlays, musicFile, muteOriginal } = {}) => {
     const form = new FormData();
     form.append('media', mediaFile);
     if (overlays && overlays.length) form.append('overlays', JSON.stringify(overlays));
-    if (musicKey) form.append('music_key', musicKey);
+    if (musicFile) form.append('music', musicFile);
+    if (muteOriginal) form.append('mute_original', '1');
     return request('/api/stories', { method: 'POST', body: form });
   },
 

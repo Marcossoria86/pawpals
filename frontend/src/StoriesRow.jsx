@@ -5,14 +5,16 @@ import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
 import MediaEditor from './MediaEditor';
 import OverlayLayer from './OverlayLayer';
-import { musicUrl } from './musicCatalog';
+import ErrorBoundary from './ErrorBoundary';
 import { IconCamera, IconGallery, IconClose, IconPawSmall, IconVolume } from './Icons';
 
-// Música de fondo de una historia de foto (sólo aplica a fotos: un video ya
-// trae su propio audio). Mismo patrón que StoryVideo: "muted" a mano sobre
-// el elemento real y un botón para (des)silenciar, así el navegador no
-// bloquea el autoplay por no ser un gesto directo del usuario.
-function StoryAudio({ musicKey }) {
+// Música de una historia — un audio que la propia persona subió (no una
+// librería nuestra). Mismo patrón que StoryVideo: "muted" a mano sobre el
+// elemento real y un botón para (des)silenciar, así el navegador no bloquea
+// el autoplay por no ser un gesto directo del usuario. `offset` la corre un
+// poco a la izquierda cuando el video de la historia TAMBIÉN tiene su
+// propio botón de silenciar (para que no queden los dos pisados).
+function StoryAudio({ src, offset }) {
   const audioRef = useRef(null);
   const [muted, setMuted] = useState(true);
 
@@ -21,14 +23,14 @@ function StoryAudio({ musicKey }) {
     if (!el) return;
     el.muted = muted;
     el.play().catch(() => {});
-  }, [muted, musicKey]);
+  }, [muted, src]);
 
   return (
     <>
-      <audio ref={audioRef} src={musicUrl(musicKey)} autoPlay loop muted={muted} />
+      <audio ref={audioRef} src={src} autoPlay loop muted={muted} />
       <button
         type="button"
-        className="story-mute-btn story-music-btn"
+        className={`story-mute-btn story-music-btn ${offset ? 'offset' : ''}`}
         onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
       >
         <IconVolume muted={muted} size={18} />
@@ -40,29 +42,33 @@ function StoryAudio({ musicKey }) {
 // El video de una historia, con el mismo arreglo que le hicimos a los
 // reels: fijamos "muted" a mano sobre el elemento (no sólo como prop de
 // React) porque si no, algunos navegadores no dejan arrancar el video solo
-// y queda trabado en un cuadro negro. También agregamos un botón de
-// silenciar aparte, igual que en reels.
-function StoryVideo({ src, onEnded }) {
+// y queda trabado en un cuadro negro. `forceMuted` se usa cuando la
+// historia tiene música propia Y quien la subió eligió silenciar el audio
+// original: ahí no tiene sentido mostrar un botón para "des-silenciarlo".
+function StoryVideo({ src, onEnded, forceMuted = false }) {
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
+  const effectiveMuted = forceMuted || muted;
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    el.muted = muted;
+    el.muted = effectiveMuted;
     el.play().catch(() => {});
-  }, [muted, src]);
+  }, [effectiveMuted, src]);
 
   return (
     <>
-      <video ref={videoRef} src={src} autoPlay playsInline muted={muted} onEnded={onEnded} />
-      <button
-        type="button"
-        className="story-mute-btn"
-        onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
-      >
-        <IconVolume muted={muted} size={18} />
-      </button>
+      <video ref={videoRef} src={src} autoPlay playsInline muted={effectiveMuted} onEnded={onEnded} />
+      {!forceMuted && (
+        <button
+          type="button"
+          className="story-mute-btn"
+          onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
+        >
+          <IconVolume muted={muted} size={18} />
+        </button>
+      )}
     </>
   );
 }
@@ -73,6 +79,16 @@ function StoryVideo({ src, onEnded }) {
 // z-index/posición fija dentro de contenedores con scroll en Safari/iOS.
 function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
   const story = group.stories[storyIndex];
+  const hasMusic = !!story.music_url;
+  const isVideo = story.media_type === 'video';
+  // Sólo forzamos mute del video si hay música Y la persona pidió
+  // silenciarlo — si no, se escuchan las dos cosas (audio original + su
+  // música) porque eligió no silenciarlo.
+  const forceMuted = hasMusic && isVideo && story.mute_original;
+  // Si el video conserva su propio audio Y además hay música, van a
+  // convivir dos botones de silenciar — así que corremos el de la música un
+  // poco para el costado para que no se pisen.
+  const musicOffset = isVideo && hasMusic && !story.mute_original;
   return createPortal(
     <div className="story-viewer" onClick={onClose}>
       <div className="story-viewer-inner" onClick={(e) => e.stopPropagation()}>
@@ -89,10 +105,10 @@ function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
           <button className="story-close" onClick={onClose}><IconClose size={18} /></button>
         </div>
         <div className="story-media">
-          {story.media_type === 'video'
-            ? <StoryVideo src={story.media_url} onEnded={onNext} />
+          {isVideo
+            ? <StoryVideo src={story.media_url} onEnded={onNext} forceMuted={forceMuted} />
             : <img src={story.media_url} alt="" />}
-          {story.media_type === 'image' && story.music_key && <StoryAudio musicKey={story.music_key} />}
+          {hasMusic && <StoryAudio src={story.music_url} offset={musicOffset} />}
           <OverlayLayer overlays={story.overlays} />
         </div>
         <div className="story-tap-zone left" onClick={onPrev} />
@@ -174,10 +190,10 @@ export default function StoriesRow({ showToast }) {
     openEditor(croppedFile);
   }
 
-  function handleEditorConfirm({ overlays, musicKey }) {
+  function handleEditorConfirm({ overlays, musicFile, muteOriginal }) {
     const file = editFile;
     closeEditor();
-    uploadStoryFile(file, { overlays, musicKey });
+    uploadStoryFile(file, { overlays, musicFile, muteOriginal });
   }
 
   function openViewer(groupIndex) {
@@ -300,26 +316,30 @@ export default function StoriesRow({ showToast }) {
       )}
 
       {cropFile && (
-        <ImageCropper
-          file={cropFile}
-          aspect={9 / 16}
-          title="Acomodá tu historia"
-          onConfirm={handleCropConfirm}
-          onCancel={() => setCropFile(null)}
-        />
+        <ErrorBoundary onReset={() => setCropFile(null)}>
+          <ImageCropper
+            file={cropFile}
+            aspect={9 / 16}
+            title="Acomodá tu historia"
+            onConfirm={handleCropConfirm}
+            onCancel={() => setCropFile(null)}
+          />
+        </ErrorBoundary>
       )}
 
       {editFile && (
-        <MediaEditor
-          mediaUrl={editUrl}
-          mediaType={editFile.type.startsWith('video/') ? 'video' : 'image'}
-          aspect={9 / 16}
-          allowMusic={editFile.type.startsWith('image/')}
-          title="Agregá texto, stickers o música"
-          confirmLabel="Publicar historia"
-          onConfirm={handleEditorConfirm}
-          onCancel={closeEditor}
-        />
+        <ErrorBoundary onReset={closeEditor} message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
+          <MediaEditor
+            mediaUrl={editUrl}
+            mediaType={editFile.type.startsWith('video/') ? 'video' : 'image'}
+            aspect={9 / 16}
+            allowMusic
+            title="Agregá texto, stickers o música"
+            confirmLabel="Publicar historia"
+            onConfirm={handleEditorConfirm}
+            onCancel={closeEditor}
+          />
+        </ErrorBoundary>
       )}
     </div>
   );

@@ -1,18 +1,24 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause } from './Icons';
-import { MUSIC_TRACKS, musicUrl } from './musicCatalog';
 
 const TEXT_COLORS = ['#ffffff', '#2b2320', '#c9683f', '#5b8c6e', '#e0b23c', '#7a5fb0'];
 const EMOJIS = ['🐾', '❤️', '😂', '😍', '🥰', '🎉', '🔥', '⭐', '😺', '🐶', '🦴', '🎾', '✨', '👀', '😴', '🥺', '💛', '🐦', '🐰', '🌈', '☀️', '🌙', '💯', '👏'];
 
-// Editor tipo Instagram para agregar texto y stickers de emoji arriba de una
-// foto o video (historias y reels comparten este mismo componente). No
-// "quema" el texto/sticker en los píxeles de la imagen: guarda su posición
-// como porcentaje del marco en una lista aparte (overlays), y esa lista se
-// dibuja arriba del medio tanto acá (para poder moverlos) como después, al
-// verlo, con OverlayLayer. Portal a <body> por la misma razón que el resto
-// de los modales de pantalla completa de la app.
+// Editor tipo Instagram para agregar texto, stickers de emoji y (en
+// historias) música propia arriba de una foto o video — historias y reels
+// comparten este mismo componente. El texto/sticker no se "quema" en los
+// píxeles: se guarda como una lista aparte (overlays) con la posición en
+// porcentaje del marco, y esa lista se dibuja arriba del medio tanto acá
+// (para poder moverlos) como después, al verlo, con OverlayLayer.
+//
+// La música es un audio que la propia persona elige de su teléfono — no
+// hay ninguna librería de canciones con derechos de autor de por medio; la
+// responsabilidad de tener permiso para usar ese audio es de quien lo sube
+// (mismo esquema que YouTube/SoundCloud), por eso el aviso abajo del picker.
+//
+// Portal a <body> por la misma razón que el resto de los modales de
+// pantalla completa de la app (ver ImageCropper).
 export default function MediaEditor({
   mediaUrl,
   mediaType = 'image',
@@ -28,13 +34,22 @@ export default function MediaEditor({
   const [panel, setPanel] = useState(null); // null | 'text' | 'sticker' | 'music'
   const [textDraft, setTextDraft] = useState('');
   const [textColor, setTextColor] = useState(TEXT_COLORS[0]);
-  const [musicKey, setMusicKey] = useState(null);
-  const [previewingKey, setPreviewingKey] = useState(null);
+  const [musicFile, setMusicFile] = useState(null);
+  const [musicPreviewUrl, setMusicPreviewUrl] = useState(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [muteOriginal, setMuteOriginal] = useState(false);
 
   const frameRef = useRef(null);
   const dragRef = useRef(null);
   const idCounterRef = useRef(1);
   const previewAudioRef = useRef(null);
+  const musicInputRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (musicPreviewUrl) URL.revokeObjectURL(musicPreviewUrl);
+    };
+  }, [musicPreviewUrl]);
 
   function nextId() {
     idCounterRef.current += 1;
@@ -68,13 +83,16 @@ export default function MediaEditor({
     e.stopPropagation();
     setSelectedId(id);
     setPanel(null);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // Si falla la captura (puede pasar en algunos navegadores) seguimos
+    // igual: no queremos que el arrastre quede roto por eso.
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
     const item = overlays.find((o) => o.id === id);
+    if (!item) return;
     dragRef.current = { id, startX: e.clientX, startY: e.clientY, startXPct: item.xPct, startYPct: item.yPct };
   }
 
   function handleFramePointerMove(e) {
-    if (!dragRef.current) return;
+    if (!dragRef.current || !frameRef.current) return;
     const rect = frameRef.current.getBoundingClientRect();
     const dxPct = ((e.clientX - dragRef.current.startX) / rect.width) * 100;
     const dyPct = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
@@ -87,30 +105,41 @@ export default function MediaEditor({
     dragRef.current = null;
   }
 
-  function togglePreview(key) {
-    const el = previewAudioRef.current;
-    if (!el) return;
-    if (previewingKey === key) {
-      el.pause();
-      setPreviewingKey(null);
-      return;
-    }
-    el.src = musicUrl(key);
-    el.currentTime = 0;
-    el.play().catch(() => {});
-    setPreviewingKey(key);
+  function handlePickMusic(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) return;
+    if (musicPreviewUrl) URL.revokeObjectURL(musicPreviewUrl);
+    setMusicFile(file);
+    setMusicPreviewUrl(URL.createObjectURL(file));
+    setPreviewPlaying(false);
   }
 
-  function chooseMusic(key) {
+  function removeMusic() {
     previewAudioRef.current?.pause();
-    setPreviewingKey(null);
-    setMusicKey(key);
-    setPanel(null);
+    if (musicPreviewUrl) URL.revokeObjectURL(musicPreviewUrl);
+    setMusicFile(null);
+    setMusicPreviewUrl(null);
+    setPreviewPlaying(false);
+  }
+
+  function togglePreview() {
+    const el = previewAudioRef.current;
+    if (!el) return;
+    if (previewPlaying) {
+      el.pause();
+      setPreviewPlaying(false);
+    } else {
+      el.currentTime = 0;
+      el.play().catch(() => {});
+      setPreviewPlaying(true);
+    }
   }
 
   function handleConfirm() {
     previewAudioRef.current?.pause();
-    onConfirm({ overlays, musicKey });
+    onConfirm({ overlays, musicFile, muteOriginal });
   }
 
   const selected = overlays.find((o) => o.id === selectedId);
@@ -178,8 +207,8 @@ export default function MediaEditor({
             <IconSticker size={18} /> <span>Stickers</span>
           </button>
           {allowMusic && (
-            <button type="button" className={`editor-tool-btn ${panel === 'music' ? 'active' : ''} ${musicKey ? 'has-value' : ''}`} onClick={() => setPanel((p) => (p === 'music' ? null : 'music'))}>
-              <IconMusic size={18} /> <span>{musicKey ? MUSIC_TRACKS.find((t) => t.key === musicKey)?.label : 'Música'}</span>
+            <button type="button" className={`editor-tool-btn ${panel === 'music' ? 'active' : ''} ${musicFile || muteOriginal ? 'has-value' : ''}`} onClick={() => setPanel((p) => (p === 'music' ? null : 'music'))}>
+              <IconMusic size={18} /> <span>{musicFile ? 'Tu música' : 'Música'}</span>
             </button>
           )}
         </div>
@@ -223,26 +252,45 @@ export default function MediaEditor({
 
         {panel === 'music' && allowMusic && (
           <div className="editor-panel">
-            <div className="editor-music-list">
-              <button
-                type="button"
-                className={`editor-music-row ${musicKey === null ? 'selected' : ''}`}
-                onClick={() => chooseMusic(null)}
-              >
-                <span>Sin música</span>
+            {mediaType === 'video' && (
+              <label className="editor-mute-row">
+                <input
+                  type="checkbox"
+                  checked={muteOriginal}
+                  onChange={(e) => setMuteOriginal(e.target.checked)}
+                />
+                <span>Silenciar el audio original del video</span>
+              </label>
+            )}
+
+            {!musicFile ? (
+              <button type="button" className="editor-reopen-btn editor-pick-music-btn" onClick={() => musicInputRef.current?.click()}>
+                <IconMusic size={15} /> Elegir audio de tu teléfono
               </button>
-              {MUSIC_TRACKS.map((t) => (
-                <div key={t.key} className={`editor-music-row ${musicKey === t.key ? 'selected' : ''}`}>
-                  <button type="button" className="editor-music-preview-btn" onClick={() => togglePreview(t.key)}>
-                    <IconPlayPause playing={previewingKey === t.key} size={16} />
-                  </button>
-                  <button type="button" className="editor-music-name-btn" onClick={() => chooseMusic(t.key)}>
-                    {t.emoji} {t.label}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <audio ref={previewAudioRef} loop onEnded={() => setPreviewingKey(null)} />
+            ) : (
+              <div className="editor-music-row selected">
+                <button type="button" className="editor-music-preview-btn" onClick={togglePreview}>
+                  <IconPlayPause playing={previewPlaying} size={16} />
+                </button>
+                <span className="editor-music-name-btn" style={{ flex: 1 }}>{musicFile.name}</span>
+                <button type="button" className="editor-delete-btn" onClick={removeMusic} aria-label="Quitar música">
+                  <IconTrash size={15} />
+                </button>
+              </div>
+            )}
+            <input
+              ref={musicInputRef}
+              type="file"
+              accept="audio/*"
+              style={{ display: 'none' }}
+              onChange={handlePickMusic}
+            />
+            {musicPreviewUrl && (
+              <audio ref={previewAudioRef} src={musicPreviewUrl} onEnded={() => setPreviewPlaying(false)} />
+            )}
+            <p className="editor-music-disclaimer">
+              Es tu responsabilidad tener los derechos para usar este audio (por ejemplo, una grabación propia).
+            </p>
           </div>
         )}
 
