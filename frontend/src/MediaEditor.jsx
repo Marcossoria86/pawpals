@@ -94,12 +94,25 @@ export default function MediaEditor({
 
   function handleFramePointerMove(e) {
     if (!dragRef.current || !frameRef.current) return;
+    // Guardamos el arrastre actual en una variable local ("drag") en vez de
+    // seguir leyendo dragRef.current más abajo, adentro del callback de
+    // setOverlays. Motivo (bug real, encontrado con el reporte de error
+    // remoto): React no siempre ejecuta ese callback en el mismo instante en
+    // que se llama a setOverlays — con varios eventos "pointermove" seguidos
+    // de un "pointerup" muy rápido (típico de un arrastre con el dedo en
+    // iPhone, algo que un mouse simulado en pruebas automáticas no reproduce
+    // igual), handleFramePointerUp podía poner dragRef.current en null ANTES
+    // de que se ejecutara el callback de un setOverlays anterior, y ese
+    // callback explotaba al hacer dragRef.current.id sobre null. Al guardar
+    // "drag" acá, el callback usa ese valor fijo capturado en este momento,
+    // sin importar qué pase con dragRef.current después.
+    const drag = dragRef.current;
     const rect = frameRef.current.getBoundingClientRect();
-    const dxPct = ((e.clientX - dragRef.current.startX) / rect.width) * 100;
-    const dyPct = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
-    const xPct = Math.max(4, Math.min(96, dragRef.current.startXPct + dxPct));
-    const yPct = Math.max(4, Math.min(96, dragRef.current.startYPct + dyPct));
-    setOverlays((prev) => prev.map((o) => (o.id === dragRef.current.id ? { ...o, xPct, yPct } : o)));
+    const dxPct = ((e.clientX - drag.startX) / rect.width) * 100;
+    const dyPct = ((e.clientY - drag.startY) / rect.height) * 100;
+    const xPct = Math.max(4, Math.min(96, drag.startXPct + dxPct));
+    const yPct = Math.max(4, Math.min(96, drag.startYPct + dyPct));
+    setOverlays((prev) => prev.map((o) => (o.id === drag.id ? { ...o, xPct, yPct } : o)));
   }
 
   function handleFramePointerUp() {
