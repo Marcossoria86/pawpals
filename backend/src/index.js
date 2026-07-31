@@ -3,11 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const db = require('./db');
-const { signToken, requireAuth, COOKIE_NAME } = require('./auth');
+const { signToken, requireAuth } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -65,20 +64,8 @@ const uploadReel = multer({
 });
 
 app.use(express.json());
-app.use(cookieParser());
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use('/uploads', express.static(UPLOADS_DIR));
-
-const IS_PROD = process.env.NODE_ENV === 'production';
-const COOKIE_OPTS = {
-  httpOnly: true,
-  // En producción, frontend y backend viven en dominios distintos (Render),
-  // así que la cookie necesita SameSite=None + Secure para viajar entre sitios.
-  // En local, ambos son "localhost" con distinto puerto, así que Lax basta.
-  sameSite: IS_PROD ? 'none' : 'lax',
-  secure: IS_PROD,
-  maxAge: 30 * 24 * 60 * 60 * 1000
-};
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some((v) => v === null || v === undefined)) return null;
@@ -149,8 +136,7 @@ app.post('/api/auth/register', (req, res) => {
   );
 
   const token = signToken(userInfo.lastInsertRowid);
-  res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
-  res.json({ ok: true });
+  res.json({ ok: true, token });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -160,12 +146,12 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
   }
   const token = signToken(user.id);
-  res.cookie(COOKIE_NAME, token, COOKIE_OPTS);
-  res.json({ ok: true });
+  res.json({ ok: true, token });
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie(COOKIE_NAME, COOKIE_OPTS);
+  // Con autenticación por Bearer token no hay nada que borrar del lado del
+  // servidor — el frontend simplemente descarta el token que tenía guardado.
   res.json({ ok: true });
 });
 
