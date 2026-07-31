@@ -675,6 +675,66 @@ app.post('/api/reports', requireAuth, writeLimiter, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- PANEL DE REPORTES (sólo para el dueño de la app) ----------
+// Todavía no existe un sistema de roles/usuarios "admin" — en vez de sumar
+// esa complejidad recién ahora, esta pantalla se protege con una clave
+// secreta separada (ADMIN_KEY) que se manda por la URL, no con el login
+// normal de un usuario cualquiera. Si ADMIN_KEY no está configurada como
+// variable de entorno, la ruta directamente no responde (404) para que
+// nunca quede expuesta por accidente con una clave "vacía".
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
+function requireAdminKey(req, res, next) {
+  if (!ADMIN_KEY) return res.status(404).json({ error: 'No disponible' });
+  const key = req.query.key || req.headers['x-admin-key'];
+  if (key !== ADMIN_KEY) return res.status(403).json({ error: 'Clave incorrecta' });
+  next();
+}
+
+app.get('/api/admin/reports', requireAdminKey, (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT reports.id, reports.target_type, reports.target_id, reports.reason, reports.details,
+              reports.status, reports.created_at,
+              reporter.name AS reporter_name, reporter.email AS reporter_email
+       FROM reports
+       JOIN users reporter ON reporter.id = reports.reporter_user_id
+       ORDER BY reports.created_at DESC, reports.id DESC`
+    )
+    .all();
+
+  // A cada reporte le sumamos un resumen de a qué/quién apunta, según el
+  // tipo, para no tener que ir a buscarlo a mano en la base cada vez.
+  const enriched = rows.map((r) => {
+    let target_summary = null;
+    if (r.target_type === 'post') {
+      const post = db
+        .prepare(`SELECT posts.caption, pets.name AS pet_name FROM posts JOIN pets ON pets.id = posts.pet_id WHERE posts.id = ?`)
+        .get(r.target_id);
+      target_summary = post ? `Publicación de ${post.pet_name}: "${(post.caption || '').slice(0, 80)}"` : 'Publicación ya eliminada';
+    } else if (r.target_type === 'comment') {
+      const comment = db
+        .prepare(`SELECT comments.body, pets.name AS pet_name FROM comments JOIN pets ON pets.id = comments.pet_id WHERE comments.id = ?`)
+        .get(r.target_id);
+      target_summary = comment ? `Comentario de ${comment.pet_name}: "${(comment.body || '').slice(0, 80)}"` : 'Comentario ya eliminado';
+    } else if (r.target_type === 'pet') {
+      const pet = db.prepare(`SELECT name, species FROM pets WHERE id = ?`).get(r.target_id);
+      target_summary = pet ? `Perfil de ${pet.name} (${pet.species})` : 'Perfil ya eliminado';
+    }
+    return { ...r, target_summary };
+  });
+
+  res.json(enriched);
+});
+
+app.patch('/api/admin/reports/:id', requireAdminKey, (req, res) => {
+  const { status } = req.body || {};
+  if (!['open', 'resolved'].includes(status)) {
+    return res.status(400).json({ error: 'Estado inválido' });
+  }
+  db.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, Number(req.params.id));
+  res.json({ ok: true });
+});
+
 // ---------- FEED ----------
 
 app.get('/api/feed', requireAuth, (req, res) => {

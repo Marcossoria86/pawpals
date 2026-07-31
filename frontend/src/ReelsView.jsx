@@ -7,7 +7,7 @@ import MediaEditor from './MediaEditor';
 import OverlayLayer from './OverlayLayer';
 import ErrorBoundary from './ErrorBoundary';
 import ReportModal from './ReportModal';
-import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload, IconFlag } from './Icons';
+import { IconHeart, IconComment, IconVolume, IconPlayPause, IconFlag } from './Icons';
 
 function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) {
   const videoRef = useRef(null);
@@ -216,8 +216,8 @@ export default function ReelsView({ showToast, onViewPet }) {
 
   return (
     <div className="reels-wrap">
-      <button className="reels-upload-fab" onClick={() => setComposerOpen(true)}>
-        <IconUpload size={15} /> <span>Subir</span>
+      <button className="reels-upload-fab" onClick={() => setComposerOpen(true)} aria-label="Subir un reel" title="Subir un reel">
+        +
       </button>
 
       {loading && <div className="reels-loading-label">Cargando reels…</div>}

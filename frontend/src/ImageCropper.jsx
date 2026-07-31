@@ -331,7 +331,6 @@ export default function ImageCropper({
           </button>
         </div>
 
-        <div className="cropper-hint">Arrastrá para mover · Pellizcá para hacer zoom · Girá para enderezar</div>
         <div className="modal-actions">
           <button className="modal-btn-secondary" onClick={onCancel} disabled={saving}>Cancelar</button>
           <button className="modal-btn-primary" onClick={handleConfirm} disabled={!natural || saving}>

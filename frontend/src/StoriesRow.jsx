@@ -4,9 +4,10 @@ import { api } from './api';
 import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
 import MediaEditor from './MediaEditor';
+import MediaPickerModal from './MediaPickerModal';
 import OverlayLayer from './OverlayLayer';
 import ErrorBoundary from './ErrorBoundary';
-import { IconCamera, IconGallery, IconClose, IconPawSmall, IconVolume } from './Icons';
+import { IconCamera, IconClose, IconPawSmall, IconVolume } from './Icons';
 
 // Música de una historia — un audio que la propia persona subió (no una
 // librería nuestra). Mismo patrón que StoryVideo: "muted" a mano sobre el
@@ -130,8 +131,7 @@ export default function StoriesRow({ showToast }) {
   const [cropFile, setCropFile] = useState(null);
   const [editFile, setEditFile] = useState(null);
   const [editUrl, setEditUrl] = useState(null);
-  const cameraInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const timerRef = useRef(null);
 
   function uploadStoryFile(file, extra) {
@@ -155,14 +155,8 @@ export default function StoriesRow({ showToast }) {
 
   useEffect(() => { load(); }, []);
 
-  function handlePickFile(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      showToast('Ese archivo no es una foto ni un video');
-      return;
-    }
+  function handlePickerSelect(file) {
+    setPickerOpen(false);
     // Las fotos se pueden acomodar (recortar) antes de subir; los videos no
     // (recortar un video ya no es un simple "encuadre" como con una
     // imagen). Ambos pasan por el editor de texto/stickers/música antes de
@@ -256,41 +250,19 @@ export default function StoriesRow({ showToast }) {
               <PetAvatar photoUrl={groups[myGroupIndex].photo_url} species={groups[myGroupIndex].species} color={groups[myGroupIndex].color} size={56} />
             </span>
           ) : (
-            <div className="story-avatar-empty" onClick={() => cameraInputRef.current?.click()}>
+            <div className="story-avatar-empty" onClick={() => setPickerOpen(true)}>
               <IconPawSmall size={26} />
             </div>
           )}
           <span
             className="story-add-badge"
-            onClick={(e) => { e.stopPropagation(); cameraInputRef.current?.click(); }}
-            title="Tomar foto o video"
+            onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
+            title="Agregar historia"
           >
             {uploading ? '…' : <IconCamera size={15} />}
           </span>
-          <span
-            className="story-gallery-badge"
-            onClick={(e) => { e.stopPropagation(); galleryInputRef.current?.click(); }}
-            title="Elegir de la galería"
-          >
-            <IconGallery size={12} />
-          </span>
         </div>
         <span className="story-label">Tu historia</span>
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          style={{ display: 'none' }}
-          onChange={handlePickFile}
-        />
-        <input
-          ref={galleryInputRef}
-          type="file"
-          accept="image/*,video/*"
-          style={{ display: 'none' }}
-          onChange={handlePickFile}
-        />
       </div>
 
       {others.map((g) => {
@@ -312,6 +284,16 @@ export default function StoriesRow({ showToast }) {
           onClose={closeViewer}
           onNext={nextStory}
           onPrev={prevStory}
+        />
+      )}
+
+      {pickerOpen && (
+        <MediaPickerModal
+          destination="story"
+          allowedDestinations={['post', 'story', 'reel']}
+          onSelect={handlePickerSelect}
+          onClose={() => setPickerOpen(false)}
+          showToast={showToast}
         />
       )}
 

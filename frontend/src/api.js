@@ -131,5 +131,12 @@ export const api = {
   conversations: () => request('/api/conversations'),
   unreadMessagesCount: () => request('/api/conversations/unread-count'),
   conversationMessages: (petId) => request(`/api/conversations/${petId}/messages`),
-  sendMessage: (petId, body) => request(`/api/conversations/${petId}/messages`, { method: 'POST', body: JSON.stringify({ body }) })
+  sendMessage: (petId, body) => request(`/api/conversations/${petId}/messages`, { method: 'POST', body: JSON.stringify({ body }) }),
+
+  // Pantalla de reportes: no usa la sesión normal de un usuario, sino una
+  // clave secreta separada (ver ADMIN_KEY en el backend) que viaja en la
+  // URL — por eso estas dos funciones no dependen del token guardado.
+  adminReports: (key) => request(`/api/admin/reports?key=${encodeURIComponent(key)}`),
+  adminSetReportStatus: (key, id, status) =>
+    request(`/api/admin/reports/${id}?key=${encodeURIComponent(key)}`, { method: 'PATCH', body: JSON.stringify({ status }) })
 };

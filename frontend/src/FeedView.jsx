@@ -6,10 +6,10 @@ import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import ReportModal from './ReportModal';
-import MediaPicker from './MediaPicker';
+import MediaPickerModal from './MediaPickerModal';
 import ImageCropper from './ImageCropper';
 import ErrorBoundary from './ErrorBoundary';
-import { IconHeart, IconShare, IconFlag } from './Icons';
+import { IconHeart, IconShare, IconFlag, IconCamera } from './Icons';
 
 function timeAgo(isoLike) {
   const date = new Date(isoLike.replace(' ', 'T') + 'Z');
@@ -37,6 +37,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
   const [cropFile, setCropFile] = useState(null);
   const [reportPostId, setReportPostId] = useState(null);
   const [openMenuPostId, setOpenMenuPostId] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const lastScrollY = useRef(0);
 
   async function load() {
@@ -83,6 +84,11 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
     // Antes de subirla, dejamos que la acomode dentro del marco (recorte)
     // para que vea exactamente cómo va a quedar en el feed.
     setCropFile(file);
+  }
+
+  function handlePickerSelect(file) {
+    setPickerOpen(false);
+    handlePickPhoto(file);
   }
 
   function handleCropConfirm(croppedFile) {
@@ -190,14 +196,9 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
           />
         </div>
         <div className="compose-row compose-row-actions">
-          <MediaPicker
-            accept="image/*"
-            onPick={handlePickPhoto}
-            cameraClassName="photo-btn"
-            galleryClassName="photo-btn gallery-btn"
-            cameraTitle="Tomar foto"
-            galleryTitle="Elegir de la galería"
-          />
+          <button type="button" className="photo-btn" title="Foto" onClick={() => setPickerOpen(true)}>
+            <IconCamera size={18} />
+          </button>
           <button disabled={(!caption.trim() && !photoFile) || posting} onClick={handlePost}>
             {posting ? 'Publicando…' : 'Publicar'}
           </button>
@@ -320,6 +321,16 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
           </div>
         </div>,
         document.body
+      )}
+
+      {pickerOpen && (
+        <MediaPickerModal
+          destination="post"
+          allowedDestinations={['post', 'story', 'reel']}
+          onSelect={handlePickerSelect}
+          onClose={() => setPickerOpen(false)}
+          showToast={showToast}
+        />
       )}
 
       {cropFile && (

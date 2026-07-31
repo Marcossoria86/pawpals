@@ -1,22 +1,22 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
+import MediaPickerModal from './MediaPickerModal';
 import ErrorBoundary from './ErrorBoundary';
 import FollowListModal from './FollowListModal';
 import SettingsModal from './SettingsModal';
 import EditProfileModal from './EditProfileModal';
-import { IconCamera, IconGallery, IconSettings } from './Icons';
+import { IconCamera, IconSettings } from './Icons';
 
 export default function ProfileView({ onLogout, showToast, onViewPet }) {
   const [me, setMe] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [listModal, setListModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const cameraInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => showToast('No se pudo cargar tu perfil'));
@@ -27,10 +27,8 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
     onLogout();
   }
 
-  function handlePickPhoto(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  function handlePickPhoto(file) {
+    setPickerOpen(false);
     if (!file.type.startsWith('image/')) {
       showToast('Ese archivo no es una imagen');
       return;
@@ -73,36 +71,12 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
           <button
             type="button"
             className="profile-photo-btn"
-            title="Tomar foto"
-            onClick={() => cameraInputRef.current?.click()}
+            title="Cambiar foto"
+            onClick={() => setPickerOpen(true)}
             disabled={uploading}
           >
             {uploading ? '…' : <IconCamera size={14} />}
           </button>
-          <button
-            type="button"
-            className="profile-gallery-btn"
-            title="Elegir de la galería"
-            onClick={() => galleryInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <IconGallery size={12} />
-          </button>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            style={{ display: 'none' }}
-            onChange={handlePickPhoto}
-          />
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handlePickPhoto}
-          />
         </div>
         <div className="profile-name">{pet.name}</div>
         <div className="profile-sub">{pet.breed} · {pet.age ?? '?'} años · dueño/a: {user.name}</div>
@@ -121,6 +95,16 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
       <div className="bio-box">{pet.bio || 'Todavía no hay una biografía para esta mascota.'}</div>
       <button className="logout-btn" onClick={() => setEditOpen(true)}>Editar perfil</button>
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
+
+      {pickerOpen && (
+        <MediaPickerModal
+          destination="profile"
+          allowedDestinations={['profile']}
+          onSelect={handlePickPhoto}
+          onClose={() => setPickerOpen(false)}
+          showToast={showToast}
+        />
+      )}
 
       {cropFile && (
         <ErrorBoundary onReset={() => setCropFile(null)} label="profile-cropper">

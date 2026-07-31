@@ -1,21 +1,26 @@
 :root{
-  --bg: #f5f3ee;
+  /* Paleta "Plata + grafito" — elegida por el usuario entre 6 opciones
+     metalizadas de prueba. Reemplaza a la terracota/verde original. Como
+     toda la app toma sus colores de estas variables (nunca hay un color
+     "pisado" a mano en los componentes), alcanza con cambiarlas acá para
+     que se actualice de golpe en todos lados. */
+  --bg: #eceef1;
   --card: #ffffff;
-  --ink: #2b2620;
-  --ink-soft: #6f6a62;
-  --line: #e7e2d8;
-  --brand: #c9683f;
-  --brand-soft: #f2e3da;
-  --accent: #4f7d6b;
-  --accent-soft: #e1ede8;
-  --input-bg: #fdfcfa;
-  --chip-bg: #f4f1ea;
-  --surface-alt: #fbf9f5;
+  --ink: #24262b;
+  --ink-soft: #6b6f78;
+  --line: #d8dbdf;
+  --brand: #6b737c;
+  --brand-soft: #e6e8eb;
+  --accent: #4f5b66;
+  --accent-soft: #e1e5e8;
+  --input-bg: #ffffff;
+  --chip-bg: #eceef1;
+  --surface-alt: #f4f5f7;
   --danger: #a3402a;
   --danger-soft: #fbe9e4;
-  --page-bg: #ded8ca;
+  --page-bg: #cbd0d5;
   --radius: 18px;
-  --shadow: 0 8px 24px rgba(43,38,32,0.08);
+  --shadow: 0 8px 24px rgba(30,34,40,0.12);
 }
 /* Modo oscuro: se activa solo, según la preferencia del sistema operativo
    de cada quien (Ajustes > Pantalla en iPhone/Android) — no hace falta
@@ -27,22 +32,22 @@
    cambie de golpe. */
 @media (prefers-color-scheme: dark){
   :root{
-    --bg: #1c1a17;
-    --card: #262320;
-    --ink: #f1ece4;
-    --ink-soft: #a89f93;
-    --line: #3a352f;
-    --brand: #e0835c;
-    --brand-soft: #3d2a20;
-    --accent: #6fa38c;
-    --accent-soft: #22332c;
-    --input-bg: #2c2822;
-    --chip-bg: #322d27;
-    --surface-alt: #221f1b;
+    --bg: #16181b;
+    --card: #202329;
+    --ink: #eceef1;
+    --ink-soft: #9aa0aa;
+    --line: #33373f;
+    --brand: #8b95a0;
+    --brand-soft: #33373f;
+    --accent: #6b7680;
+    --accent-soft: #262a2f;
+    --input-bg: #24272c;
+    --chip-bg: #282b31;
+    --surface-alt: #1d2024;
     --danger: #e2795f;
     --danger-soft: #3a2620;
-    --page-bg: #0f0e0c;
-    --shadow: 0 8px 24px rgba(0,0,0,0.45);
+    --page-bg: #0d0e10;
+    --shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
 }
 *{box-sizing:border-box;}

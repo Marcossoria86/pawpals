@@ -3,6 +3,7 @@ import './App.css';
 import { api } from './api';
 import AuthView from './AuthView';
 import ResetPasswordView from './ResetPasswordView';
+import AdminReportsView from './AdminReportsView';
 import FeedView from './FeedView';
 import NearbyView from './NearbyView';
 import ProfileView from './ProfileView';
@@ -33,6 +34,10 @@ function App() {
   // ?resetToken=... — si está presente, mostramos esa pantalla en vez del
   // login/app normal, sin importar si ya había una sesión iniciada.
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('resetToken'));
+  // Pantalla de reportes, sólo para vos: ?adminKey=... en la URL, sin pasar
+  // por el login normal (ver ADMIN_KEY en el backend). No se guarda en
+  // ningún lado más que en la URL que vos abras.
+  const adminKey = new URLSearchParams(window.location.search).get('adminKey');
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [tab, setTab] = useState('feed');
@@ -164,6 +169,10 @@ function App() {
     const interval = setInterval(() => { refreshUnread(); refreshUnreadMessages(); }, 20000);
     return () => clearInterval(interval);
   }, [authenticated, refreshUnread, refreshUnreadMessages]);
+
+  if (adminKey) {
+    return <AdminReportsView adminKey={adminKey} />;
+  }
 
   if (resetToken) {
     return (

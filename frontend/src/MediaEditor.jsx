@@ -1,6 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause, IconRotate } from './Icons';
+import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause } from './Icons';
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// Ángulo (en grados) entre dos puntos, para medir cuánto giraron los dos
+// dedos de un pellizco entre un instante y el siguiente.
+function angleBetween(a, b) {
+  return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+}
+
+// Lleva cualquier ángulo a un valor equivalente entre -180 y 180 — así el
+// giro nunca "se sale" del rango que después valida el backend (ver
+// sanitizeOverlays en el servidor), sin que eso le cambie el aspecto visual
+// (girar 190° se ve igual que girar -170°).
+function normalizeAngle(deg) {
+  let d = deg % 360;
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  return d;
+}
 
 const TEXT_COLORS = ['#ffffff', '#2b2320', '#c9683f', '#5b8c6e', '#e0b23c', '#7a5fb0'];
 const EMOJIS = ['🐾', '❤️', '😂', '😍', '🥰', '🎉', '🔥', '⭐', '😺', '🐶', '🦴', '🎾', '✨', '👀', '😴', '🥺', '💛', '🐦', '🐰', '🌈', '☀️', '🌙', '💯', '👏'];
@@ -42,6 +63,9 @@ export default function MediaEditor({
 
   const frameRef = useRef(null);
   const dragRef = useRef(null);
+  const pinchRef = useRef(null);
+  const pointersRef = useRef(new Map());
+  const lastTapRef = useRef({ id: null, time: 0 });
   const idCounterRef = useRef(1);
   const previewAudioRef = useRef(null);
   const musicInputRef = useRef(null);
@@ -71,8 +95,8 @@ export default function MediaEditor({
     setTextDraft('');
   }
 
-  function updateSelected(patch) {
-    setOverlays((prev) => prev.map((o) => (o.id === selectedId ? { ...o, ...patch } : o)));
+  function patchOverlay(id, patch) {
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
   }
 
   function deleteSelected() {
@@ -80,19 +104,88 @@ export default function MediaEditor({
     setSelectedId(null);
   }
 
+  // Un dedo mueve el texto/sticker de lugar (como antes). Dos dedos sobre el
+  // elemento seleccionado lo agrandan/achican y lo giran a la vez — el mismo
+  // gesto de "pellizcar" que ya se usa para hacer zoom a una foto, en vez de
+  // sliders aparte. Un doble toque rápido sobre el elemento lo vuelve a su
+  // tamaño y giro original, por si te "pasaste" y querés arrancar de nuevo
+  // sin tener que ir ajustando a mano.
   function handleItemPointerDown(e, id) {
     e.stopPropagation();
     setSelectedId(id);
     setPanel(null);
-    // Si falla la captura (puede pasar en algunos navegadores) seguimos
-    // igual: no queremos que el arrastre quede roto por eso.
+    // Si falla la captura (puede pasar en algunos navegadores, sobre todo
+    // al bajar el segundo dedo casi junto con el primero) seguimos igual:
+    // no queremos que el gesto quede roto por eso.
     try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
     const item = overlays.find((o) => o.id === id);
     if (!item) return;
-    dragRef.current = { id, startX: e.clientX, startY: e.clientY, startXPct: item.xPct, startYPct: item.yPct };
+
+    const now = Date.now();
+    if (lastTapRef.current.id === id && now - lastTapRef.current.time < 320) {
+      patchOverlay(id, { scale: 1, rotation: 0 });
+      lastTapRef.current = { id: null, time: 0 };
+    } else {
+      lastTapRef.current = { id, time: now };
+    }
+
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 2) {
+      // El segundo dedo bajó justo sobre el elemento (en vez de sobre el
+      // fondo del marco, que es lo que maneja handleFramePointerDown) —
+      // arrancamos el pellizco acá directamente.
+      startPinch(id, item);
+    } else if (pointersRef.current.size === 1) {
+      dragRef.current = { id, startX: e.clientX, startY: e.clientY, startXPct: item.xPct, startYPct: item.yPct };
+      pinchRef.current = null;
+    }
+  }
+
+  // El segundo dedo del pellizco casi siempre cae sobre el fondo del marco
+  // (no exactamente sobre el textito o sticker, que es chico) — por eso el
+  // marco también necesita su propio onPointerDown para sumarlo a
+  // pointersRef y, si ya hay un elemento seleccionado, arrancar el pellizco.
+  function handleFramePointerDown(e) {
+    if (!selected) return;
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* noop */ }
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 2) {
+      startPinch(selected.id, selected);
+    }
+  }
+
+  function startPinch(id, item) {
+    const pts = Array.from(pointersRef.current.values());
+    pinchRef.current = {
+      id,
+      startDist: dist(pts[0], pts[1]) || 1,
+      startAngle: angleBetween(pts[0], pts[1]),
+      startScale: item.scale,
+      startRotation: item.rotation || 0
+    };
+    dragRef.current = null;
   }
 
   function handleFramePointerMove(e) {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (pointersRef.current.size === 2 && pinchRef.current) {
+      // Ver el mismo comentario de "drag" más abajo: guardamos pinch acá en
+      // una variable local para no volver a leer pinchRef.current adentro
+      // del callback de setOverlays, por si cambia entre medio.
+      const pinch = pinchRef.current;
+      const pts = Array.from(pointersRef.current.values());
+      const d = dist(pts[0], pts[1]);
+      const angle = angleBetween(pts[0], pts[1]);
+      const scaleRatio = d / pinch.startDist;
+      const nextScale = Math.max(0.5, Math.min(2.5, pinch.startScale * scaleRatio));
+      const nextRotation = normalizeAngle(pinch.startRotation + (angle - pinch.startAngle));
+      setOverlays((prev) => prev.map((o) => (o.id === pinch.id ? { ...o, scale: nextScale, rotation: nextRotation } : o)));
+      return;
+    }
+
     if (!dragRef.current || !frameRef.current) return;
     // Guardamos el arrastre actual en una variable local ("drag") en vez de
     // seguir leyendo dragRef.current más abajo, adentro del callback de
@@ -115,8 +208,25 @@ export default function MediaEditor({
     setOverlays((prev) => prev.map((o) => (o.id === drag.id ? { ...o, xPct, yPct } : o)));
   }
 
-  function handleFramePointerUp() {
-    dragRef.current = null;
+  function handleFramePointerUp(e) {
+    if (e && pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.delete(e.pointerId);
+    } else if (!e) {
+      pointersRef.current.clear();
+    }
+    if (pointersRef.current.size === 1 && pinchRef.current) {
+      // Quedó un dedo solo apoyado (se levantó uno de los dos del
+      // pellizco): volvemos a arrastre normal con ese dedo, sin que el
+      // elemento "salte" de golpe.
+      const id = pinchRef.current.id;
+      const [, pt] = Array.from(pointersRef.current.entries())[0];
+      const item = overlays.find((o) => o.id === id);
+      dragRef.current = item ? { id, startX: pt.x, startY: pt.y, startXPct: item.xPct, startYPct: item.yPct } : null;
+      pinchRef.current = null;
+    } else if (pointersRef.current.size === 0) {
+      dragRef.current = null;
+      pinchRef.current = null;
+    }
   }
 
   function handlePickMusic(e) {
@@ -175,9 +285,11 @@ export default function MediaEditor({
           className="cropper-frame editor-frame"
           ref={frameRef}
           style={{ aspectRatio: aspect }}
+          onPointerDown={handleFramePointerDown}
           onPointerMove={handleFramePointerMove}
           onPointerUp={handleFramePointerUp}
           onPointerLeave={handleFramePointerUp}
+          onPointerCancel={handleFramePointerUp}
           onClick={() => setSelectedId(null)}
         >
           {mediaType === 'video' ? (
@@ -208,36 +320,11 @@ export default function MediaEditor({
         </div>
 
         {selected && (
-          <>
-            <div className="editor-selected-row">
-              <span className="cropper-zoom-label">Tamaño</span>
-              <input
-                type="range" min="0.5" max="2.5" step="0.05"
-                value={selected.scale}
-                onChange={(e) => updateSelected({ scale: Number(e.target.value) })}
-              />
-              <button type="button" className="editor-delete-btn" onClick={deleteSelected} aria-label="Eliminar">
-                <IconTrash size={17} />
-              </button>
-            </div>
-            <div className="editor-selected-row">
-              <span className="cropper-zoom-label">Girar</span>
-              <input
-                type="range" min="-180" max="180" step="1"
-                value={selected.rotation || 0}
-                onChange={(e) => updateSelected({ rotation: Number(e.target.value) })}
-              />
-              <button
-                type="button"
-                className="editor-delete-btn"
-                onClick={() => updateSelected({ rotation: 0 })}
-                aria-label="Restablecer giro"
-                title="Restablecer giro"
-              >
-                <IconRotate size={15} />
-              </button>
-            </div>
-          </>
+          <div className="editor-selected-row editor-selected-row-compact">
+            <button type="button" className="editor-delete-btn" onClick={deleteSelected} aria-label="Eliminar">
+              <IconTrash size={17} />
+            </button>
+          </div>
         )}
 
         <div className="editor-toolbar">
@@ -345,7 +432,6 @@ export default function MediaEditor({
           </div>
         )}
 
-        <div className="cropper-hint">Arrastrá el texto o el sticker para moverlo</div>
         <div className="modal-actions">
           <button className="modal-btn-secondary" onClick={onCancel}>Cancelar</button>
           <button

@@ -1540,14 +1540,17 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   border:none;
   background:rgba(0,0,0,0.55);
   color:#fff;
-  font-size:12px;
+  font-size:22px;
   font-weight:700;
-  padding:8px 12px;
-  border-radius:20px;
+  line-height:1;
+  width:34px;
+  height:34px;
+  padding:0;
+  border-radius:50%;
   cursor:pointer;
   display:flex;
   align-items:center;
-  gap:5px;
+  justify-content:center;
 }
 .reels-loading-label{
   position:absolute;
@@ -1869,6 +1872,11 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   margin-top:10px;
 }
 .editor-selected-row input[type=range]{ flex:1; }
+/* Ahora que agrandar/girar el texto o sticker se hace pellizcando directo
+   sobre el elemento (como el zoom de una foto), esta fila queda sólo con el
+   botón de borrar — lo centramos en vez de dejarlo pegado a la izquierda
+   como cuando acompañaba a un slider. */
+.editor-selected-row-compact{ justify-content:center; }
 .editor-delete-btn{
   width:30px;height:30px;
   border-radius:50%;
@@ -2015,3 +2023,282 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   line-height:1.4;
   margin:10px 0 0;
 }
+
+/* Pantalla de reportes (sólo para el dueño de la app, ver AdminReportsView). */
+.admin-reports-page{
+  min-height:100vh;
+  background:var(--page-bg);
+  padding:20px 16px 60px;
+  font-family:'Fredoka', sans-serif;
+  color:var(--ink);
+  max-width:640px;
+  margin:0 auto;
+}
+.admin-reports-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:16px;
+}
+.admin-reports-head h1{ font-size:20px; margin:0; }
+.admin-reports-count{
+  background:var(--brand-soft);
+  color:var(--brand);
+  font-size:12px;
+  font-weight:700;
+  padding:4px 10px;
+  border-radius:12px;
+  flex-shrink:0;
+}
+.admin-reports-error{
+  background:var(--danger-soft);
+  color:var(--danger);
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:13.5px;
+  margin-bottom:14px;
+}
+.admin-reports-loading,
+.admin-reports-empty{
+  color:var(--ink-soft);
+  font-size:13.5px;
+  text-align:center;
+  padding:30px 0;
+}
+.admin-reports-filters{
+  display:flex;
+  gap:8px;
+  margin-bottom:14px;
+}
+.admin-reports-filters button{
+  border:1px solid var(--line);
+  background:var(--card);
+  color:var(--ink-soft);
+  font-family:inherit;
+  font-size:12.5px;
+  font-weight:600;
+  padding:7px 14px;
+  border-radius:14px;
+  cursor:pointer;
+}
+.admin-reports-filters button.active{
+  background:var(--brand);
+  color:#fff;
+  border-color:var(--brand);
+}
+.admin-reports-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.admin-report-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  box-shadow:var(--shadow);
+}
+.admin-report-card.resolved{ opacity:0.6; }
+.admin-report-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+.admin-report-reason{ font-weight:700; font-size:13.5px; }
+.admin-report-date{ font-size:11.5px; color:var(--ink-soft); flex-shrink:0; }
+.admin-report-target{ font-size:13px; margin-bottom:4px; }
+.admin-report-details{
+  font-size:12.5px;
+  color:var(--ink-soft);
+  font-style:italic;
+  margin-bottom:6px;
+}
+.admin-report-reporter{ font-size:11.5px; color:var(--ink-soft); margin-bottom:10px; }
+.admin-report-actions button{
+  border:1px solid var(--line);
+  background:var(--chip-bg);
+  color:var(--ink);
+  font-family:inherit;
+  font-size:12px;
+  font-weight:700;
+  padding:7px 12px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+/* Selector de fotos/video estilo Instagram (MediaPickerModal) — a
+   propósito NO usa .modal-backdrop/.modal-card (que son para diálogos
+   chicos centrados): esto ocupa toda la pantalla, oscuro, como el picker
+   nativo de una app de fotos. */
+.picker-modal{
+  position:fixed;
+  inset:0;
+  z-index:110;
+  background:#0b0b0c;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  font-family:'Fredoka', sans-serif;
+}
+.picker-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: calc(14px + env(safe-area-inset-top)) 10px 10px;
+  flex-shrink:0;
+}
+.picker-icon-btn{
+  width:40px;height:40px;
+  border:none;
+  background:none;
+  color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.picker-next-btn{ color:#4da3ff; }
+.picker-next-btn:disabled{ color:#555; cursor:not-allowed; }
+.picker-title{ font-size:14.5px; font-weight:700; }
+.picker-preview{
+  flex:1;
+  min-height:0;
+  background:#000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.picker-preview-media{
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+}
+.picker-preview-empty{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  color:#666;
+  font-size:13px;
+}
+.picker-tabs-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  flex-shrink:0;
+}
+.picker-tabs{ display:flex; gap:18px; }
+.picker-tabs button{
+  background:none;
+  border:none;
+  color:#8a8a8e;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:700;
+  padding:4px 0;
+  border-bottom:2px solid transparent;
+  cursor:pointer;
+}
+.picker-tabs button.active{ color:#fff; border-color:#fff; }
+.picker-select-pill{
+  border:1px solid #555;
+  background:none;
+  color:#fff;
+  font-family:inherit;
+  font-size:11.5px;
+  font-weight:700;
+  padding:5px 12px;
+  border-radius:14px;
+  cursor:pointer;
+}
+.picker-select-pill.active{ background:#fff; color:#0b0b0c; border-color:#fff; }
+.picker-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:2px;
+  max-height:34vh;
+  overflow-y:auto;
+  flex-shrink:0;
+}
+.picker-grid-tile{
+  position:relative;
+  aspect-ratio:1;
+  border:none;
+  padding:0;
+  margin:0;
+  background:#1c1c1e;
+  color:#ccc;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  cursor:pointer;
+  overflow:hidden;
+}
+.picker-tile-gallery span{ font-size:9.5px; font-weight:600; }
+.picker-thumb img, .picker-thumb video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.picker-thumb.selected{ outline:2.5px solid #fff; outline-offset:-2.5px; }
+.picker-thumb-check{
+  position:absolute;
+  top:4px; right:4px;
+  width:18px;height:18px;
+  border-radius:50%;
+  background:#0a84ff;
+  color:#fff;
+  display:flex;align-items:center;justify-content:center;
+}
+.picker-thumb-play{
+  position:absolute;
+  top:4px; left:4px;
+  color:#fff;
+  opacity:0.9;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+.picker-thumb-duration{
+  position:absolute;
+  bottom:3px; right:4px;
+  background:rgba(0,0,0,0.6);
+  color:#fff;
+  font-size:9.5px;
+  font-weight:600;
+  padding:1px 4px;
+  border-radius:4px;
+}
+.picker-drafts-empty{
+  padding:36px 20px;
+  text-align:center;
+  color:#777;
+  font-size:13px;
+  flex:1;
+}
+.picker-dest-pill-row{
+  display:flex;
+  justify-content:center;
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+  flex-shrink:0;
+}
+.picker-dest-pill{
+  display:flex;
+  background:rgba(255,255,255,0.08);
+  border-radius:20px;
+  padding:3px;
+  gap:2px;
+}
+.picker-dest-pill span{
+  padding:7px 16px;
+  border-radius:18px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.02em;
+  color:#787878;
+}
+.picker-dest-pill span.active{ background:#fff; color:#0b0b0c; }
