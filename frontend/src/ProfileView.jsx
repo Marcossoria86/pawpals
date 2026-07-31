@@ -4,13 +4,17 @@ import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
 import ErrorBoundary from './ErrorBoundary';
 import FollowListModal from './FollowListModal';
-import { IconCamera, IconGallery } from './Icons';
+import SettingsModal from './SettingsModal';
+import EditProfileModal from './EditProfileModal';
+import { IconCamera, IconGallery, IconSettings } from './Icons';
 
 export default function ProfileView({ onLogout, showToast, onViewPet }) {
   const [me, setMe] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
   const [listModal, setListModal] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
@@ -55,6 +59,15 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
   return (
     <section>
       <div className="profile-hero">
+        <button
+          type="button"
+          className="profile-settings-btn"
+          title="Configuración"
+          aria-label="Configuración"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <IconSettings size={18} />
+        </button>
         <div className="profile-avatar-wrap">
           <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} size={84} className="profile-avatar" />
           <button
@@ -106,6 +119,7 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
       </div>
       <div className="section-title">Sobre {pet.name}</div>
       <div className="bio-box">{pet.bio || 'Todavía no hay una biografía para esta mascota.'}</div>
+      <button className="logout-btn" onClick={() => setEditOpen(true)}>Editar perfil</button>
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
 
       {cropFile && (
@@ -128,6 +142,27 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
           onClose={() => setListModal(null)}
           onViewPet={(id) => { setListModal(null); onViewPet?.(id); }}
           showToast={showToast}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal
+          me={me}
+          onClose={() => setSettingsOpen(false)}
+          onLogout={onLogout}
+          showToast={showToast}
+        />
+      )}
+
+      {editOpen && (
+        <EditProfileModal
+          pet={pet}
+          onClose={() => setEditOpen(false)}
+          showToast={showToast}
+          onSaved={(updated) => {
+            setEditOpen(false);
+            setMe((prev) => ({ ...prev, pet: { ...prev.pet, ...updated } }));
+          }}
         />
       )}
     </section>

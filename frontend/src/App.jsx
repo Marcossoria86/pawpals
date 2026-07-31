@@ -39,7 +39,42 @@ function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [messagesInitialPetId, setMessagesInitialPetId] = useState(null);
+  const [tabbarHidden, setTabbarHidden] = useState(false);
   const mainRef = useRef(null);
+  const navRef = useRef(null);
+  const lastScrollTopRef = useRef(0);
+
+  // Se engancha en <main> con onScrollCapture (fase de "captura"), que sí
+  // detecta el scroll de contenedores internos (como el feed vertical de
+  // reels o la lista de mensajes) aunque el evento "scroll" del DOM no
+  // burbujee — así una sola función cubre todas las pestañas. El nav es
+  // position:fixed (ver App.css) a propósito: esconderlo nunca cambia el
+  // tamaño de <main>, así que no hay riesgo de que este mismo cambio
+  // dispare otro evento de scroll y termine parpadeando solo.
+  //
+  // lastScrollTopRef sólo se actualiza cuando de verdad decidimos
+  // mostrar/esconder (no en cada evento): así queda como una "banda" de
+  // referencia — hace falta moverse más de UMBRAL píxeles netos desde la
+  // última decisión para que vuelva a cambiar. Sin esto, el rebote/inercia
+  // natural del scroll por inercia en el teléfono (que va y viene unos
+  // pocos píxeles mientras frena) hace que la barra parpadee sola.
+  const SCROLL_HIDE_THRESHOLD = 40;
+  function handleScrollCapture(e) {
+    const top = e.target.scrollTop ?? 0;
+    if (top < 24) {
+      setTabbarHidden(false);
+      lastScrollTopRef.current = top;
+      return;
+    }
+    const delta = top - lastScrollTopRef.current;
+    if (delta > SCROLL_HIDE_THRESHOLD) {
+      setTabbarHidden(true);
+      lastScrollTopRef.current = top;
+    } else if (delta < -SCROLL_HIDE_THRESHOLD) {
+      setTabbarHidden(false);
+      lastScrollTopRef.current = top;
+    }
+  }
 
   function toggleSearch() {
     setSearchOpen((prev) => {
@@ -59,6 +94,10 @@ function App() {
     // goToMessages (desde "Enviar mensaje" en un perfil) abre directo una
     // conversación puntual.
     setMessagesInitialPetId(null);
+    // Al cambiar de pestaña siempre mostramos la barra de nuevo — si no, se
+    // podía quedar escondida de la pestaña anterior sin forma de recuperarla.
+    lastScrollTopRef.current = 0;
+    setTabbarHidden(false);
   }
 
   // Tocar las patitas / "PawPals" del header vuelve al feed y lo desplaza
@@ -69,6 +108,8 @@ function App() {
     setSearchQuery('');
     setMessagesInitialPetId(null);
     setTab('feed');
+    lastScrollTopRef.current = 0;
+    setTabbarHidden(false);
     requestAnimationFrame(() => {
       mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     });
@@ -99,6 +140,8 @@ function App() {
     setSearchQuery('');
     setTab('messages');
     setMessagesInitialPetId(petId);
+    lastScrollTopRef.current = 0;
+    setTabbarHidden(false);
   }
 
   useEffect(() => {
@@ -155,7 +198,11 @@ function App() {
         )}
       </header>
 
-      <main ref={mainRef} className={tab === 'reels' || tab === 'messages' ? 'no-pad' : ''}>
+      <main
+        ref={mainRef}
+        className={tab === 'reels' || tab === 'messages' ? 'no-pad' : ''}
+        onScrollCapture={handleScrollCapture}
+      >
         {viewingPetId ? (
           <PetProfileView
             petId={viewingPetId}
@@ -190,7 +237,7 @@ function App() {
         )}
       </main>
 
-      <nav className="tabbar">
+      <nav ref={navRef} className={`tabbar ${tabbarHidden ? 'tabbar-hidden' : ''}`}>
         {TABS.map((t) => (
           <button
             key={t.key}

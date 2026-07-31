@@ -179,6 +179,24 @@ export function IconTrash({ size = 18 }) {
   );
 }
 
+export function IconSettings({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 13.6a1.7 1.7 0 0 0 .34 1.87l.06.06a2.06 2.06 0 1 1-2.92 2.92l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56v.17a2.06 2.06 0 1 1-4.12 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2.06 2.06 0 1 1-2.92-2.92l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03h-.17a2.06 2.06 0 1 1 0-4.12h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2.06 2.06 0 1 1 2.92-2.92l.06.06a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1.03-1.56v-.17a2.06 2.06 0 1 1 4.12 0v.09a1.7 1.7 0 0 0 1.03 1.56h.08a1.7 1.7 0 0 0 1.87-.34l.06-.06a2.06 2.06 0 1 1 2.92 2.92l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03h.17a2.06 2.06 0 1 1 0 4.12h-.09a1.7 1.7 0 0 0-1.56 1.03Z" />
+    </svg>
+  );
+}
+
+export function IconLocation({ size = 18 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21Z" />
+      <circle cx="12" cy="9.5" r="2.4" />
+    </svg>
+  );
+}
+
 export function IconPawSmall({ size = 22 }) {
   return (
     <svg {...COMMON} width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">

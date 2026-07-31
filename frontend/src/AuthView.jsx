@@ -3,6 +3,23 @@ import { api } from './api';
 import PetIllustration, { SPECIES_LIST } from './PetIllustration';
 import LegalModal from './LegalModal';
 
+// Pide la ubicación real del dispositivo — es lo que dispara el permiso
+// nativo de ubicación la primera vez. Nunca rechaza la promesa: si la
+// persona lo niega, el navegador tarda, o el dispositivo no lo soporta,
+// simplemente seguimos el registro sin ubicación (el backend cae a una
+// ubicación por defecto, y se puede activar más tarde desde Configuración).
+function getBrowserLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({});
+    const timeout = setTimeout(() => resolve({}), 7000);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { clearTimeout(timeout); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      () => { clearTimeout(timeout); resolve({}); },
+      { enableHighAccuracy: false, timeout: 6500, maximumAge: 60000 }
+    );
+  });
+}
+
 export default function AuthView({ onAuthenticated }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
@@ -39,10 +56,17 @@ export default function AuthView({ onAuthenticated }) {
     setError('');
     setLoading(true);
     try {
+      // Acá es donde el navegador (o iOS/Android en la app empaquetada)
+      // muestra por primera vez el cartel de "¿Permitir que PawPals use tu
+      // ubicación?". Si la persona lo rechaza o tarda, seguimos igual: el
+      // backend usa una ubicación por defecto y se puede activar/actualizar
+      // después desde Configuración.
+      const location = await getBrowserLocation();
       await api.register({
         ...registerForm,
         petAge: registerForm.petAge ? Number(registerForm.petAge) : null,
-        acceptTerms: true
+        acceptTerms: true,
+        ...location
       });
       onAuthenticated();
     } catch (err) {

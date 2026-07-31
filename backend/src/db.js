@@ -130,6 +130,10 @@ ensureColumn('stories', 'music_path', 'TEXT');
 ensureColumn('stories', 'mute_original', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('posts', 'overlays', 'TEXT');
 ensureColumn('users', 'accepted_terms_at', 'TEXT');
+// Si está en 0, la mascota deja de aparecer en "Cerca de ti" para las demás
+// personas (ver Configuración en el perfil) — no borra la ubicación guardada,
+// solo la oculta de los resultados de otros.
+ensureColumn('pets', 'share_location', 'INTEGER NOT NULL DEFAULT 1');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

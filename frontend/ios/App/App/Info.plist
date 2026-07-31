@@ -47,5 +47,15 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PawPals usa la cámara para que puedas tomar fotos y videos de tu mascota para publicaciones, historias y reels.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PawPals usa el micrófono para grabar el audio de los videos que subís (por ejemplo, a una historia o un reel).</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PawPals necesita acceder a tus fotos y videos para que puedas elegirlos y publicarlos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>PawPals puede guardar fotos en tu galería cuando lo pidas.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PawPals usa tu ubicación aproximada para mostrarte mascotas cerca tuyo en "Cerca de ti".</string>
 </dict>
 </plist>

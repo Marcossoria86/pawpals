@@ -15,6 +15,12 @@
   display:flex;
   flex-direction:column;
   position:relative;
+  /* transform (aunque no haga nada visualmente) convierte a .phone en el
+     "containing block" del nav de abajo, que ahora es position:fixed — así
+     el nav queda encerrado en el ancho del "teléfono" y no en toda la
+     ventana del navegador cuando esta tarjeta no ocupa la pantalla entera
+     (por ejemplo, en la versión de escritorio, más angosta que el viewport). */
+  transform: translateZ(0);
   box-shadow: var(--shadow);
   margin: 0 auto;
   overflow:hidden;
@@ -640,12 +646,28 @@ main{
 
 /* Profile view */
 .profile-hero{
+  position:relative;
   background:var(--card);
   border:1px solid var(--line);
   border-radius:var(--radius);
   padding:20px 16px;
   text-align:center;
   margin-bottom:16px;
+}
+.profile-settings-btn{
+  position:absolute;
+  top:12px;
+  right:12px;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:var(--bg);
+  color:var(--ink-soft);
+  border:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
 }
 .profile-avatar-wrap{
   position:relative;
@@ -745,14 +767,29 @@ main{
   cursor:pointer;
 }
 
-/* Bottom nav */
+/* Bottom nav — se oculta al bajar en el scroll y vuelve al subir (ver
+   handleScrollCapture en App.jsx). Va con position:fixed (no como parte del
+   flex column) a propósito: si en cambio achicáramos su alto para
+   "esconderla", eso agranda <main> (flex:1) en el mismo instante, lo que
+   dispara otro evento de scroll synthetic y termina en un parpadeo infinito
+   entre mostrada/escondida. Con position:fixed, esconderla es puramente
+   visual (transform+opacity) y nunca cambia el tamaño de <main>. */
 nav.tabbar{
-  position:sticky;
+  position:fixed;
   bottom:0;left:0;right:0;
   background:var(--card);
   border-top:1px solid var(--line);
   display:flex;
   padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  z-index:30;
+  transform:translateY(0);
+  opacity:1;
+  transition: transform .22s ease, opacity .18s ease;
+}
+nav.tabbar.tabbar-hidden{
+  transform:translateY(100%);
+  opacity:0;
+  pointer-events:none;
 }
 .tab{
   flex:1;
@@ -1270,6 +1307,56 @@ main.no-pad{ padding:0; }
   white-space:pre-line;
 }
 
+/* ---------- Modal de Configuración (perfil) ---------- */
+.settings-modal-card{ max-width:400px; }
+.settings-body{ display:flex; flex-direction:column; }
+.settings-section-title{
+  font-size:12px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+  color:var(--ink-soft);
+  margin:16px 0 8px;
+}
+.settings-section-title:first-child{ margin-top:0; }
+.settings-section-title.danger{ color:var(--danger); }
+.settings-secondary-btn{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  text-align:left;
+  border:1px solid var(--line);
+  background:var(--bg);
+  color:var(--ink);
+  font-size:13px;
+  font-weight:600;
+  padding:10px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  margin-bottom:8px;
+}
+.settings-secondary-btn:disabled{ opacity:0.6; cursor:not-allowed; }
+.settings-help-text{
+  font-size:12.5px;
+  color:var(--ink-soft);
+  line-height:1.5;
+  margin:0 0 6px;
+}
+.settings-help-text a{ color:var(--brand); font-weight:700; }
+.settings-danger-btn{
+  border:1px solid var(--danger);
+  background:var(--danger-soft);
+  color:var(--danger);
+  font-size:13px;
+  font-weight:700;
+  padding:10px 14px;
+  border-radius:10px;
+  cursor:pointer;
+}
+.settings-danger-btn:disabled{ opacity:0.6; cursor:not-allowed; }
+.settings-delete-confirm{ margin-top:4px; }
+
 /* ---------- Publicación compartida (anidada) ---------- */
 .shared-embed{
   border:1px solid var(--line);
@@ -1538,6 +1625,15 @@ main.no-pad{ padding:0; }
     justify-content:center;
     gap:8px;
     padding:10px 16px;
+  }
+  /* En escritorio el nav es una barra de arriba en el flujo normal, no una
+     barra flotante de abajo — el efecto de esconder al scrollear es sólo
+     para el "look" de app de celular, así que en escritorio la dejamos
+     siempre visible. */
+  nav.tabbar.tabbar-hidden{
+    transform:none;
+    opacity:1;
+    pointer-events:auto;
   }
   .tab{
     flex:none;

@@ -284,6 +284,82 @@ app.patch('/api/pets/me/photo', requireAuth, (req, res, next) => {
   res.json({ photo_url: absoluteUploadUrl(req, req.file.filename) });
 });
 
+// Guarda la ubicación real del dispositivo (o la reemplaza si la persona la
+// actualiza a mano desde Configuración). Los valores llegan del navegador
+// (navigator.geolocation), nunca inventados por el backend.
+app.patch('/api/pets/me/location', requireAuth, (req, res) => {
+  const lat = Number(req.body.lat);
+  const lng = Number(req.body.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return res.status(400).json({ error: 'Ubicación inválida' });
+  }
+  const pet = getPetByOwner(req.userId);
+  if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+  db.prepare('UPDATE pets SET lat = ?, lng = ? WHERE id = ?').run(lat, lng, pet.id);
+  res.json({ ok: true });
+});
+
+// Prender/apagar si la mascota aparece en los resultados de "Cerca de ti" de
+// otras personas (ver sección de Privacidad en Configuración).
+app.patch('/api/pets/me/privacy', requireAuth, (req, res) => {
+  const pet = getPetByOwner(req.userId);
+  if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+  db.prepare('UPDATE pets SET share_location = ? WHERE id = ?').run(req.body.shareLocation ? 1 : 0, pet.id);
+  res.json({ ok: true, shareLocation: !!req.body.shareLocation });
+});
+
+// Borrado de cuenta (Configuración → Eliminar mi cuenta). Pedimos la
+// contraseña de nuevo como confirmación extra antes de una acción
+// irreversible. El borrado de la fila en "users" hace cascada (ON DELETE
+// CASCADE) sobre mascotas, publicaciones, historias, comentarios, likes,
+// citas de juego, mensajes, seguimientos y notificaciones relacionadas —
+// acá además intentamos borrar del disco los archivos que haya subido
+// (best-effort: si algún archivo ya no está, no rompemos el borrado por eso).
+app.delete('/api/me', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'No encontrado' });
+  if (!bcrypt.compareSync(req.body.password || '', user.password_hash)) {
+    // 403, no 401: la persona SIGUE autenticada (su token es válido), sólo
+    // escribió mal la contraseña de confirmación. Si acá devolviéramos 401,
+    // el frontend lo interpreta como "sesión vencida" y borra el token
+    // guardado (ver api.js), dejándola des-logueada de golpe sin explicación
+    // después de un solo error de tipeo.
+    return res.status(403).json({ error: 'Contraseña incorrecta' });
+  }
+
+  const pet = getPetByOwner(req.userId);
+  const filePaths = [];
+  if (pet) {
+    if (pet.photo_path) filePaths.push(pet.photo_path);
+    db.prepare('SELECT image_path, video_path FROM posts WHERE pet_id = ?').all(pet.id)
+      .forEach((p) => { if (p.image_path) filePaths.push(p.image_path); if (p.video_path) filePaths.push(p.video_path); });
+    db.prepare('SELECT media_path, music_path FROM stories WHERE pet_id = ?').all(pet.id)
+      .forEach((s) => { if (s.media_path) filePaths.push(s.media_path); if (s.music_path) filePaths.push(s.music_path); });
+  }
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.userId);
+
+  filePaths.forEach((filename) => {
+    fs.unlink(path.join(UPLOADS_DIR, filename), () => {});
+  });
+
+  res.json({ ok: true });
+});
+
+// Editar perfil (nombre, especie, raza, edad, bio) desde Mi perfil.
+app.patch('/api/pets/me/profile', requireAuth, (req, res) => {
+  const { name, species, breed, age, bio } = req.body;
+  if (!name || !species || !breed) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  }
+  const pet = getPetByOwner(req.userId);
+  if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+  db.prepare(
+    'UPDATE pets SET name = ?, species = ?, breed = ?, age = ?, bio = ? WHERE id = ?'
+  ).run(name, species, breed, age || null, bio || '', pet.id);
+  res.json({ ok: true });
+});
+
 app.get('/api/pets/:id', requireAuth, (req, res) => {
   const petId = Number(req.params.id);
   const pet = db
@@ -538,7 +614,12 @@ app.get('/api/nearby', requireAuth, (req, res) => {
   const myPet = getPetByOwner(req.userId);
   if (!myPet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
-  const others = db.prepare('SELECT pets.*, users.name AS owner_name FROM pets JOIN users ON users.id = pets.owner_id WHERE pets.owner_id != ?').all(req.userId);
+  const others = db
+    .prepare(
+      `SELECT pets.*, users.name AS owner_name FROM pets JOIN users ON users.id = pets.owner_id
+       WHERE pets.owner_id != ? AND pets.share_location = 1`
+    )
+    .all(req.userId);
 
   const sentRequests = db
     .prepare('SELECT target_pet_id, status FROM playdates WHERE requester_pet_id = ?')

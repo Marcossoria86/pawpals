@@ -61,6 +61,9 @@ export const api = {
     }
   },
   me: () => request('/api/me'),
+  updateMyLocation: ({ lat, lng }) => request('/api/pets/me/location', { method: 'PATCH', body: JSON.stringify({ lat, lng }) }),
+  updateLocationPrivacy: (shareLocation) => request('/api/pets/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareLocation }) }),
+  deleteAccount: (password) => request('/api/me', { method: 'DELETE', body: JSON.stringify({ password }) }),
   feed: () => request('/api/feed'),
   createPost: ({ caption, photoFile }) => {
     const form = new FormData();
@@ -76,6 +79,7 @@ export const api = {
   nearby: () => request('/api/nearby'),
   requestPlaydate: (targetPetId) => request('/api/playdates', { method: 'POST', body: JSON.stringify({ targetPetId }) }),
   pet: (petId) => request(`/api/pets/${petId}`),
+  updatePetProfile: (payload) => request('/api/pets/me/profile', { method: 'PATCH', body: JSON.stringify(payload) }),
   uploadPetPhoto: (photoFile) => {
     const form = new FormData();
     form.append('photo', photoFile);
