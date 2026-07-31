@@ -258,7 +258,7 @@ export default function ReelsView({ showToast, onViewPet }) {
       )}
 
       {editorOpen && videoUrl && (
-        <ErrorBoundary onReset={() => setEditorOpen(false)} message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
+        <ErrorBoundary onReset={() => setEditorOpen(false)} label="reel-editor" message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
           <MediaEditor
             mediaUrl={videoUrl}
             mediaType="video"

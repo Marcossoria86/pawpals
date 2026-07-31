@@ -29,7 +29,7 @@ document.addEventListener(
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ErrorBoundary fatal>
+    <ErrorBoundary fatal label="app-root">
       <App />
     </ErrorBoundary>
   </StrictMode>,

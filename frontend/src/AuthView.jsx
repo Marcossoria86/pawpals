@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import PetIllustration, { SPECIES_LIST } from './PetIllustration';
 import LegalModal from './LegalModal';
+import { IconPawPair } from './Icons';
 
 // Pide la ubicación real del dispositivo — es lo que dispara el permiso
 // nativo de ubicación la primera vez. Nunca rechaza la promesa: si la
@@ -79,7 +80,7 @@ export default function AuthView({ onAuthenticated }) {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <div className="auth-title">🐾 PawPals</div>
+        <div className="auth-title"><IconPawPair size={22} /> PawPals</div>
         <div className="auth-sub">
           {mode === 'login' ? 'Entra a tu cuenta' : 'Crea tu cuenta y el perfil de tu mascota'}
         </div>

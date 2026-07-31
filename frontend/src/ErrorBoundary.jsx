@@ -1,5 +1,33 @@
 import { Component } from 'react';
 import { IconClose } from './Icons';
+import { API_BASE } from './api';
+
+// Mandamos el error real al backend para que quede en los logs de Render —
+// así, la próxima vez que algo falle en el teléfono de alguien (donde no
+// tenemos forma de abrir la consola del navegador), igual podemos ver el
+// mensaje y el stack exactos en vez de adivinar a ciegas. Es "mejor
+// esfuerzo": si el pedido en sí falla (sin internet, etc.) no hacemos nada
+// más, total ya se mostró el cartel de error en pantalla.
+function reportClientError(error, errorInfo, label) {
+  try {
+    const payload = {
+      label: label || null,
+      message: String(error?.message || error),
+      stack: error?.stack || null,
+      componentStack: errorInfo?.componentStack || null,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    fetch(`${API_BASE}/api/client-errors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true
+    }).catch(() => {});
+  } catch {
+    /* noop — nunca queremos que el reporte de errores cause otro error */
+  }
+}
 
 // Red de seguridad: si algo dentro (por ejemplo el editor de historias/reels)
 // tira un error inesperado, React por defecto "desmonta" toda la app y deja
@@ -19,9 +47,10 @@ export default class ErrorBoundary extends Component {
     return { hasError: true };
   }
 
-  componentDidCatch(error) {
+  componentDidCatch(error, errorInfo) {
     // eslint-disable-next-line no-console
     console.error('ErrorBoundary atrapó un error:', error);
+    reportClientError(error, errorInfo, this.props.label);
   }
 
   handleClose = () => {

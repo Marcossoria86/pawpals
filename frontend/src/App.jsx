@@ -12,7 +12,7 @@ import RequestsView from './RequestsView';
 import NotificationsView from './NotificationsView';
 import MessagesView from './MessagesView';
 import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
-import { IconSearch, IconClose, IconPawSmall } from './Icons';
+import { IconSearch, IconClose, IconPawPair } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
 // pendientes de aceptar/rechazar), Cerca de ti (ocupa el lugar que en
@@ -184,7 +184,7 @@ function App() {
           />
         ) : (
           <button type="button" className="logo logo-btn" onClick={goHome} title="Ir al inicio">
-            <IconPawSmall size={20} /> PawPals
+            <IconPawPair size={20} /> PawPals
           </button>
         )}
         {searchableTab && (

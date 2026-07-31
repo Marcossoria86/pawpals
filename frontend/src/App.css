@@ -124,6 +124,9 @@ main{
   font-size:22px;
   font-weight:800;
   margin-bottom:2px;
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
 .auth-sub{
   font-size:13px;
@@ -1703,15 +1706,11 @@ main.no-pad{ padding:0; }
   padding:4px 6px;
   border-radius:6px;
 }
-/* Al texto seleccionado sí le dejamos un borde punteado (ayuda a ver dónde
-   termina la caja de texto). A un sticker (un emoji) un recuadro se ve raro
-   — en cambio le damos un resplandor suave y circular, más acorde a su
-   forma, para que se note que está seleccionado sin la "caja". */
-.editor-overlay-item.overlay-text.selected{
-  outline:2px dashed rgba(255,255,255,0.85);
-  outline-offset:2px;
-  border-radius:6px;
-}
+/* Ni al texto ni al sticker seleccionado les dejamos un recuadro/borde
+   punteado (a pedido: se veía raro en los dos casos) — en cambio, un
+   resplandor suave detrás de la forma real, para que se note qué está
+   seleccionado sin agregar una "caja" artificial alrededor. */
+.editor-overlay-item.overlay-text.selected,
 .editor-overlay-item.overlay-sticker.selected{
   text-shadow:
     0 0 8px rgba(255,255,255,0.9),

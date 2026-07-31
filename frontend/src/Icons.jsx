@@ -197,6 +197,31 @@ export function IconLocation({ size = 18 }) {
   );
 }
 
+// Dos huellitas (como el emoji 🐾, pero dibujado a mano) — es "el ícono de
+// PawPals" que se usa junto al nombre de la app en el header y en la
+// pantalla de inicio de sesión. Reemplaza al de una sola huella (IconPawSmall,
+// que queda para otros usos) porque a la gente le gustaba más el de dos.
+export function IconPawPair({ size = 22 }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">
+      <g transform="translate(14,15) rotate(-18) scale(12)">
+        <ellipse cx="0" cy="0.16" rx="0.28" ry="0.20" />
+        <ellipse cx="-0.28" cy="-0.10" rx="0.10" ry="0.13" />
+        <ellipse cx="-0.10" cy="-0.26" rx="0.10" ry="0.135" />
+        <ellipse cx="0.10" cy="-0.26" rx="0.10" ry="0.135" />
+        <ellipse cx="0.28" cy="-0.10" rx="0.10" ry="0.13" />
+      </g>
+      <g transform="translate(7,7) rotate(-18) scale(7.2)">
+        <ellipse cx="0" cy="0.16" rx="0.28" ry="0.20" />
+        <ellipse cx="-0.28" cy="-0.10" rx="0.10" ry="0.13" />
+        <ellipse cx="-0.10" cy="-0.26" rx="0.10" ry="0.135" />
+        <ellipse cx="0.10" cy="-0.26" rx="0.10" ry="0.135" />
+        <ellipse cx="0.28" cy="-0.10" rx="0.10" ry="0.13" />
+      </g>
+    </svg>
+  );
+}
+
 export function IconPawSmall({ size = 22 }) {
   return (
     <svg {...COMMON} width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">

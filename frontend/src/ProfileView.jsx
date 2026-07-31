@@ -123,7 +123,7 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
 
       {cropFile && (
-        <ErrorBoundary onReset={() => setCropFile(null)}>
+        <ErrorBoundary onReset={() => setCropFile(null)} label="profile-cropper">
           <ImageCropper
             file={cropFile}
             aspect={1}

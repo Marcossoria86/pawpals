@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo del ícono adaptativo (Android 8+): antes tenía la cuadrícula
+     turquesa de ejemplo que trae Android Studio por defecto — la
+     reemplazamos por el color de marca de PawPals, liso, detrás de las dos
+     patitas (ver ic_launcher_foreground.xml / los PNG en mipmap-*). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportHeight="108"
+    android:viewportWidth="108">
+    <path
+        android:fillColor="#c9683f"
+        android:pathData="M0,0h108v108h-108z" />
+</vector>

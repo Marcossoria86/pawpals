@@ -299,7 +299,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
       )}
 
       {cropFile && (
-        <ErrorBoundary onReset={() => setCropFile(null)}>
+        <ErrorBoundary onReset={() => setCropFile(null)} label="feed-cropper">
           <ImageCropper
             file={cropFile}
             aspect={4 / 3}

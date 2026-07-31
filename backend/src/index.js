@@ -180,6 +180,26 @@ function isFollowing(followerPetId, followedPetId) {
     .get(followerPetId, followedPetId);
 }
 
+// Reportes de errores atrapados por ErrorBoundary en el frontend (ver
+// ErrorBoundary.jsx) — sin esto, un error que sólo pasa en el teléfono de
+// alguien es imposible de diagnosticar porque no hay forma de abrir la
+// consola del navegador ahí. Se ve en la pestaña "Logs" de Render, buscando
+// "[CLIENT ERROR]". Sin autenticación a propósito: un error puede pasar
+// incluso con la sesión vencida, y no queremos perder ese reporte por eso.
+app.post('/api/client-errors', (req, res) => {
+  const { label, message, stack, componentStack, userAgent, url } = req.body || {};
+  console.error('[CLIENT ERROR]', JSON.stringify({
+    label: label ? String(label).slice(0, 100) : null,
+    message: message ? String(message).slice(0, 500) : null,
+    stack: stack ? String(stack).slice(0, 3000) : null,
+    componentStack: componentStack ? String(componentStack).slice(0, 3000) : null,
+    userAgent: userAgent ? String(userAgent).slice(0, 300) : null,
+    url: url ? String(url).slice(0, 300) : null,
+    at: new Date().toISOString()
+  }));
+  res.json({ ok: true });
+});
+
 // ---------- AUTH ----------
 
 app.post('/api/auth/register', (req, res) => {

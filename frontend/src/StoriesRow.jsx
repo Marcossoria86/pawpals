@@ -316,7 +316,7 @@ export default function StoriesRow({ showToast }) {
       )}
 
       {cropFile && (
-        <ErrorBoundary onReset={() => setCropFile(null)}>
+        <ErrorBoundary onReset={() => setCropFile(null)} label="story-cropper">
           <ImageCropper
             file={cropFile}
             aspect={9 / 16}
@@ -328,7 +328,7 @@ export default function StoriesRow({ showToast }) {
       )}
 
       {editFile && (
-        <ErrorBoundary onReset={closeEditor} message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
+        <ErrorBoundary onReset={closeEditor} label="story-editor" message="No pudimos abrir el editor de texto/stickers. Cerrá e intentá de nuevo — podés seguir usando la app mientras tanto.">
           <MediaEditor
             mediaUrl={editUrl}
             mediaType={editFile.type.startsWith('video/') ? 'video' : 'image'}
