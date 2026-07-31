@@ -7,6 +7,7 @@ import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import ReportModal from './ReportModal';
 import MediaPickerModal from './MediaPickerModal';
+import CrossPostFlow from './CrossPostFlow';
 import ImageCropper from './ImageCropper';
 import ErrorBoundary from './ErrorBoundary';
 import { IconHeart, IconShare, IconFlag, IconCamera } from './Icons';
@@ -23,7 +24,15 @@ function timeAgo(isoLike) {
   return `hace ${diffD} d`;
 }
 
-export default function FeedView({ showToast, searchQuery = '', onViewPet, scrollContainerRef }) {
+export default function FeedView({
+  showToast,
+  searchQuery = '',
+  onViewPet,
+  scrollContainerRef,
+  refreshSignal = 0,
+  onCreatedStory,
+  onCreatedReel
+}) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [caption, setCaption] = useState('');
@@ -38,6 +47,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
   const [reportPostId, setReportPostId] = useState(null);
   const [openMenuPostId, setOpenMenuPostId] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [crossPost, setCrossPost] = useState(null); // { kind, file }
   const lastScrollY = useRef(0);
 
   async function load() {
@@ -52,7 +62,10 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // El signal cambia cuando OTRA pantalla (historias/reels) crea un post
+  // desde su propia cámara con la píldora en "Publicación" — así el feed
+  // se entera y se actualiza solo. También carga la primera vez (mount).
+  useEffect(() => { load(); }, [refreshSignal]);
 
   // Esconde el cuadro de "publicar" al bajar en el feed (para que no tape
   // el contenido) y lo vuelve a mostrar al subir, como pidió el usuario.
@@ -86,9 +99,19 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
     setCropFile(file);
   }
 
-  function handlePickerSelect(file) {
+  function handlePickerSelect(file, destination) {
     setPickerOpen(false);
-    handlePickPhoto(file);
+    if (destination === 'post') {
+      handlePickPhoto(file);
+    } else {
+      setCrossPost({ kind: destination, file });
+    }
+  }
+
+  function handleCrossPostDone(kind) {
+    setCrossPost(null);
+    if (kind === 'story') onCreatedStory?.();
+    if (kind === 'reel') onCreatedReel?.();
   }
 
   function handleCropConfirm(croppedFile) {
@@ -329,7 +352,16 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
           allowedDestinations={['post', 'story', 'reel']}
           onSelect={handlePickerSelect}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {crossPost && (
+        <CrossPostFlow
+          kind={crossPost.kind}
+          file={crossPost.file}
           showToast={showToast}
+          onCancel={() => setCrossPost(null)}
+          onDone={handleCrossPostDone}
         />
       )}
 

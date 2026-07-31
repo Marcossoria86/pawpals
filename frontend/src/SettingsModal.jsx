@@ -3,8 +3,31 @@ import { createPortal } from 'react-dom';
 import { api } from './api';
 import LegalModal from './LegalModal';
 import PetAvatar from './PetAvatar';
-import { IconClose, IconLocation } from './Icons';
+import { IconClose, IconLocation, IconChevronRight } from './Icons';
 import { SUPPORT_EMAIL } from './config';
+
+// Sección colapsable (título + flecha) para achicar el largo del modal por
+// defecto — "Cambiar contraseña", "Cambiar correo" y "Legal" ya no se ven
+// siempre abiertas, sólo al tocarlas.
+function AccordionSection({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="settings-accordion">
+      <button
+        type="button"
+        className="settings-accordion-head"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span>{title}</span>
+        <span className={`settings-accordion-chevron ${open ? 'open' : ''}`}>
+          <IconChevronRight size={16} />
+        </span>
+      </button>
+      {open && <div className="settings-accordion-body">{children}</div>}
+    </div>
+  );
+}
 
 // Pide la ubicación real del dispositivo para el botón "Actualizar mi
 // ubicación ahora" — si la persona nunca dio permiso (o lo había negado),
@@ -163,61 +186,65 @@ export default function SettingsModal({ me, onClose, onLogout, showToast }) {
               )}
 
               <div className="settings-section-title">Seguridad</div>
-              <div className="settings-form-row">
-                <label>Cambiar contraseña</label>
-                <input
-                  type="password"
-                  placeholder="Contraseña actual"
-                  value={currentPwForPw}
-                  onChange={(e) => setCurrentPwForPw(e.target.value)}
-                />
-                <input
-                  type="password"
-                  placeholder="Nueva contraseña (mínimo 6 caracteres)"
-                  value={newPw}
-                  onChange={(e) => setNewPw(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="settings-primary-btn"
-                onClick={handleChangePassword}
-                disabled={!currentPwForPw || newPw.length < 6 || savingPw}
-              >
-                {savingPw ? 'Guardando…' : 'Actualizar contraseña'}
-              </button>
+              <AccordionSection title="Cambiar contraseña">
+                <div className="settings-form-row">
+                  <input
+                    type="password"
+                    placeholder="Contraseña actual"
+                    value={currentPwForPw}
+                    onChange={(e) => setCurrentPwForPw(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="settings-primary-btn"
+                  onClick={handleChangePassword}
+                  disabled={!currentPwForPw || newPw.length < 6 || savingPw}
+                >
+                  {savingPw ? 'Guardando…' : 'Actualizar contraseña'}
+                </button>
+              </AccordionSection>
 
-              <div className="settings-form-row">
-                <label>Cambiar correo (actual: {me?.user?.email})</label>
-                <input
-                  type="email"
-                  placeholder="Nuevo correo"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                />
-                <input
-                  type="password"
-                  placeholder="Tu contraseña actual"
-                  value={currentPwForEmail}
-                  onChange={(e) => setCurrentPwForEmail(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="settings-primary-btn"
-                onClick={handleChangeEmail}
-                disabled={!newEmail.trim() || !currentPwForEmail || savingEmail}
-              >
-                {savingEmail ? 'Guardando…' : 'Actualizar correo'}
-              </button>
+              <AccordionSection title="Cambiar correo">
+                <div className="settings-form-row">
+                  <label>Actual: {me?.user?.email}</label>
+                  <input
+                    type="email"
+                    placeholder="Nuevo correo"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Tu contraseña actual"
+                    value={currentPwForEmail}
+                    onChange={(e) => setCurrentPwForEmail(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="settings-primary-btn"
+                  onClick={handleChangeEmail}
+                  disabled={!newEmail.trim() || !currentPwForEmail || savingEmail}
+                >
+                  {savingEmail ? 'Guardando…' : 'Actualizar correo'}
+                </button>
+              </AccordionSection>
 
-              <div className="settings-section-title">Legal</div>
-              <button type="button" className="settings-secondary-btn" onClick={() => setLegalOpen('terms')}>
-                Ver Términos y Condiciones
-              </button>
-              <button type="button" className="settings-secondary-btn" onClick={() => setLegalOpen('privacy')}>
-                Ver Política de Privacidad
-              </button>
+              <AccordionSection title="Legal">
+                <button type="button" className="settings-secondary-btn" onClick={() => setLegalOpen('terms')}>
+                  Ver Términos y Condiciones
+                </button>
+                <button type="button" className="settings-secondary-btn" onClick={() => setLegalOpen('privacy')}>
+                  Ver Política de Privacidad
+                </button>
+              </AccordionSection>
 
               <div className="settings-section-title">Ayuda</div>
               <p className="settings-help-text">

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose, IconRotate } from './Icons';
+import { IconClose } from './Icons';
 
 // Modal para "acomodar" una foto antes de subirla: se ve el marco tal cual
 // va a quedar (cuadrado para el perfil o publicaciones, vertical para
@@ -19,6 +19,19 @@ import { IconClose, IconRotate } from './Icons';
 // barra de navegación de abajo tapa los botones.
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// Ángulo (en grados) entre dos puntos — mide cuánto giraron los dos dedos
+// del pellizco entre un instante y el siguiente, igual que en MediaEditor.
+function angleBetween(a, b) {
+  return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+}
+
+function normalizeAngle(deg) {
+  let d = deg % 360;
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  return d;
 }
 
 // Cuánto hay que agrandar la foto (además del zoom que ya eligió la
@@ -156,20 +169,27 @@ export default function ImageCropper({
 
   // Un dedo (o el mouse) arrastra la foto para reencuadrarla, en cualquier
   // dirección — horizontal y vertical — dentro del margen que deje el zoom
-  // actual. Dos dedos hacen zoom tipo "pellizco", sin ningún botón: al bajar
-  // el segundo dedo guardamos la distancia entre ambos y el zoom de partida,
-  // y mientras se mueven vamos escalando el zoom según cuánto cambió esa
-  // distancia.
+  // actual. Dos dedos hacen zoom Y giro a la vez, tipo "pellizcar y
+  // torcer", sin ningún botón ni slider: al bajar el segundo dedo
+  // guardamos la distancia y el ángulo entre ambos, más el zoom/giro de
+  // partida, y mientras se mueven vamos recalculando los dos según cuánto
+  // cambiaron esa distancia y ese ángulo.
   function handlePointerDown(e) {
     // Si falla la captura (puede pasar con algunos navegadores al bajar el
     // segundo dedo casi al mismo tiempo que el primero) seguimos igual: no
-    // queremos perder el segundo puntero y que el pellizco quede roto.
+    // queremos perder el segundo puntero y que el gesto quede roto.
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size === 2) {
       const pts = Array.from(pointersRef.current.values());
-      pinchRef.current = { startDist: dist(pts[0], pts[1]) || 1, startZoom: zoom };
+      pinchRef.current = {
+        startDist: dist(pts[0], pts[1]) || 1,
+        startAngle: angleBetween(pts[0], pts[1]),
+        startZoom: zoom,
+        startRotation: rotation
+      };
       dragRef.current = null;
+      setStraightening(true);
     } else if (pointersRef.current.size === 1) {
       dragRef.current = { startX: e.clientX, startY: e.clientY, startOffset: offset };
       pinchRef.current = null;
@@ -183,9 +203,12 @@ export default function ImageCropper({
     if (pointersRef.current.size === 2 && pinchRef.current) {
       const pts = Array.from(pointersRef.current.values());
       const d = dist(pts[0], pts[1]);
+      const angle = angleBetween(pts[0], pts[1]);
       const ratio = d / pinchRef.current.startDist;
       const nextZoom = Math.max(1, Math.min(4, pinchRef.current.startZoom * ratio));
+      const nextRotation = snapRotation(normalizeAngle(pinchRef.current.startRotation + (angle - pinchRef.current.startAngle)));
       setZoom(nextZoom);
+      setRotation(nextRotation);
       return;
     }
 
@@ -206,9 +229,11 @@ export default function ImageCropper({
       const [, pt] = Array.from(pointersRef.current.entries())[0];
       dragRef.current = { startX: pt.x, startY: pt.y, startOffset: offset };
       pinchRef.current = null;
+      setStraightening(false);
     } else if (pointersRef.current.size === 0) {
       dragRef.current = null;
       pinchRef.current = null;
+      setStraightening(false);
     }
   }
 
@@ -297,38 +322,20 @@ export default function ImageCropper({
               }}
             />
           )}
-          {/* Grilla de alineación (tipo "enderezar" de Instagram): sólo se ve
-              mientras se está arrastrando el control de girar, para ayudar a
-              volver a dejar la foto derecha sin que quede permanentemente en
-              el medio tapando la imagen. */}
+          {/* Grilla de alineación + indicador de grados (tipo "enderezar" de
+              Instagram): sólo se ven mientras los dos dedos están apoyados
+              girando la foto, para ayudar a dejarla derecha — no quedan
+              permanentemente en el medio tapando la imagen. Girar ahora es
+              con los dedos (torciendo, igual que el pellizco de zoom), no
+              con un slider aparte. */}
           {straightening && (
-            <div className="cropper-grid" aria-hidden="true">
-              <span /><span /><span /><span />
-            </div>
+            <>
+              <div className="cropper-grid" aria-hidden="true">
+                <span /><span /><span /><span />
+              </div>
+              <div className="cropper-angle-badge">{Math.round(rotation)}°</div>
+            </>
           )}
-        </div>
-
-        <div className="cropper-rotate-row">
-          <IconRotate size={15} />
-          <input
-            type="range"
-            min="-180"
-            max="180"
-            step="1"
-            value={rotation}
-            onPointerDown={() => setStraightening(true)}
-            onPointerUp={() => setStraightening(false)}
-            onChange={(e) => setRotation(snapRotation(Number(e.target.value)))}
-          />
-          <button
-            type="button"
-            className="cropper-rotate-reset"
-            onClick={() => setRotation(0)}
-            aria-label="Dejar la foto derecha"
-            title="Dejar la foto derecha"
-          >
-            {Math.round(rotation)}°
-          </button>
         </div>
 
         <div className="modal-actions">

@@ -379,24 +379,21 @@ main{
 .cropper-grid span:nth-child(2){ left:66.666%; top:0; bottom:0; width:1px; }
 .cropper-grid span:nth-child(3){ top:33.333%; left:0; right:0; height:1px; }
 .cropper-grid span:nth-child(4){ top:66.666%; left:0; right:0; height:1px; }
-.cropper-rotate-row{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-top:10px;
-  color:var(--ink-soft);
-}
-.cropper-rotate-row input[type=range]{ flex:1; }
-.cropper-rotate-reset{
-  border:1px solid var(--line);
-  background:var(--bg);
-  color:var(--ink-soft);
-  font-size:11.5px;
+/* Indicador de grados: aparece flotando sobre la foto sólo mientras se está
+   girando con los dos dedos (junto con la grilla), no es un control — nada
+   que tocar, sólo feedback de cuánto se giró. */
+.cropper-angle-badge{
+  position:absolute;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,0.55);
+  color:#fff;
+  font-size:12px;
   font-weight:700;
-  padding:5px 8px;
-  border-radius:8px;
-  cursor:pointer;
-  min-width:42px;
+  padding:4px 10px;
+  border-radius:12px;
+  pointer-events:none;
 }
 
 .photo-preview{
@@ -930,77 +927,91 @@ main.no-pad{ padding:0; }
 }
 
 /* ---------- Historias ---------- */
+/* Tarjetas grandes verticales con la foto de fondo (estilo Facebook), en
+   vez de los círculos chicos que había antes: cada una muestra la primera
+   foto/video de esa historia (o la foto de perfil si no hay), con un
+   degradado oscuro abajo para que el nombre en blanco se lea bien, y un
+   avatar circular con anillo de color arriba a la izquierda (menos en la
+   propia, que en cambio tiene el botón "+" para crear una historia). */
 .stories-row{
   display:flex;
-  gap:14px;
+  gap:10px;
   overflow-x:auto;
   padding: 2px 2px 16px;
   margin-bottom:4px;
 }
-.story-circle{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:4px;
-  cursor:pointer;
+.story-card{
+  position:relative;
   flex-shrink:0;
-  width:64px;
+  width:112px;
+  height:180px;
+  border-radius:14px;
+  overflow:hidden;
+  cursor:pointer;
+  background:var(--chip-bg);
+  box-shadow:var(--shadow);
 }
-.story-avatar-wrap{
-  width:60px;
-  height:60px;
+.story-card-media{ position:absolute; inset:0; }
+.story-card-media img, .story-card-media video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.story-card-fallback{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.story-card-shade{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(0,0,0,0.72) 100%);
+  pointer-events:none;
+}
+.story-card-avatar{
+  position:absolute;
+  top:8px;
+  left:8px;
   border-radius:50%;
   padding:2px;
   background: linear-gradient(45deg, var(--brand), var(--accent));
   display:flex;
-  align-items:center;
-  justify-content:center;
-  position:relative;
 }
-.story-avatar-wrap .avatar{ width:56px; height:56px; border:2px solid var(--bg); }
-.story-avatar-wrap.add{ background: var(--line); }
-.story-avatar-empty{
-  width:56px;
-  height:56px;
-  border-radius:50%;
-  background:var(--card);
-  border:2px solid var(--bg);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:var(--ink-soft);
-  cursor:pointer;
-}
-.story-add-badge{
+.story-card-avatar .avatar{ border:2px solid var(--card); }
+.story-card-label{
   position:absolute;
-  bottom:-3px;
-  right:-3px;
-  width:26px;
-  height:26px;
+  left:8px;
+  right:8px;
+  bottom:9px;
+  color:#fff;
+  font-size:12px;
+  font-weight:700;
+  text-shadow:0 1px 3px rgba(0,0,0,0.5);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.story-card-add .story-card-label{ text-align:center; left:0; right:0; }
+.story-card-plus{
+  position:absolute;
+  left:50%;
+  bottom:26px;
+  transform:translateX(-50%);
+  width:32px;
+  height:32px;
   border-radius:50%;
+  border:3px solid var(--card);
   background:var(--brand);
   color:#fff;
-  font-size:15px;
+  font-size:19px;
   font-weight:700;
+  line-height:1;
   display:flex;
   align-items:center;
   justify-content:center;
-  border:2px solid var(--bg);
-  cursor:pointer;
-}
-.story-gallery-badge{
-  position:absolute;
-  top:-2px;
-  left:-2px;
-  width:20px;
-  height:20px;
-  border-radius:50%;
-  background:var(--card);
-  color:var(--ink-soft);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border:2px solid var(--bg);
   cursor:pointer;
 }
 .story-label{
@@ -1242,6 +1253,17 @@ main.no-pad{ padding:0; }
   padding:20px;
   width:100%;
   max-width:360px;
+  /* Antes esto no tenía techo de altura: si el contenido (por ejemplo el
+     editor de historias o Configuración, que son largos) no entraba en la
+     pantalla, la tarjeta se salía por arriba Y por abajo del todo porque
+     .modal-backdrop la centra vertical sin scroll propio — quedaba
+     "cortada" y a veces hasta la cruz de cerrar quedaba fuera de la
+     pantalla, imposible de tocar. Con esto, la tarjeta nunca es más alta
+     que la pantalla: ELLA MISMA scrollea, y el título/las acciones quedan
+     pegados (sticky) arriba y abajo mientras el resto se desliza detrás. */
+  max-height: 88vh;
+  max-height: 88dvh;
+  overflow-y:auto;
 }
 .modal-title{
   font-size:16px;
@@ -1254,6 +1276,10 @@ main.no-pad{ padding:0; }
   align-items:center;
   justify-content:space-between;
   margin-bottom:10px;
+  position:sticky;
+  top:0;
+  background:var(--card);
+  z-index:2;
 }
 .modal-title-row .modal-title{ margin-bottom:0; }
 .modal-close-x{
@@ -1403,6 +1429,37 @@ main.no-pad{ padding:0; }
 }
 .settings-danger-btn:disabled{ opacity:0.6; cursor:not-allowed; }
 .settings-delete-confirm{ margin-top:4px; }
+.settings-accordion{
+  border:1px solid var(--line);
+  border-radius:12px;
+  margin-bottom:10px;
+  overflow:hidden;
+}
+.settings-accordion-head{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--bg);
+  border:none;
+  padding:11px 14px;
+  font-family:inherit;
+  font-size:13.5px;
+  font-weight:700;
+  color:var(--ink);
+  cursor:pointer;
+}
+.settings-accordion-chevron{
+  display:flex;
+  color:var(--ink-soft);
+  transition: transform .15s ease;
+}
+.settings-accordion-chevron.open{ transform:rotate(90deg); }
+.settings-accordion-body{
+  padding:12px 14px 14px;
+  border-top:1px solid var(--line);
+}
+.settings-accordion-body .settings-secondary-btn:last-child{ margin-bottom:0; }
 .settings-form-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
 .settings-form-row label{ font-size:12px; font-weight:700; color:var(--ink-soft); }
 .settings-form-row input{
@@ -2203,18 +2260,6 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   cursor:pointer;
 }
 .picker-tabs button.active{ color:#fff; border-color:#fff; }
-.picker-select-pill{
-  border:1px solid #555;
-  background:none;
-  color:#fff;
-  font-family:inherit;
-  font-size:11.5px;
-  font-weight:700;
-  padding:5px 12px;
-  border-radius:14px;
-  cursor:pointer;
-}
-.picker-select-pill.active{ background:#fff; color:#0b0b0c; border-color:#fff; }
 .picker-grid{
   display:grid;
   grid-template-columns:repeat(4, 1fr);
@@ -2293,12 +2338,16 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   padding:3px;
   gap:2px;
 }
-.picker-dest-pill span{
+.picker-dest-pill button{
+  border:none;
+  background:none;
+  font-family:inherit;
   padding:7px 16px;
   border-radius:18px;
   font-size:11px;
   font-weight:700;
   letter-spacing:0.02em;
-  color:#787878;
+  color:#9a9a9a;
+  cursor:pointer;
 }
-.picker-dest-pill span.active{ background:#fff; color:#0b0b0c; }
+.picker-dest-pill button.active{ background:#fff; color:#0b0b0c; }

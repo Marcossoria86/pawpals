@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import PetIllustration from './PetIllustration';
 import ImageCropper from './ImageCropper';
 import MediaEditor from './MediaEditor';
 import MediaPickerModal from './MediaPickerModal';
+import CrossPostFlow from './CrossPostFlow';
 import OverlayLayer from './OverlayLayer';
 import ErrorBoundary from './ErrorBoundary';
-import { IconCamera, IconClose, IconPawSmall, IconVolume } from './Icons';
+import { IconClose, IconVolume } from './Icons';
 
 // Música de una historia — un audio que la propia persona subió (no una
 // librería nuestra). Mismo patrón que StoryVideo: "muted" a mano sobre el
@@ -123,7 +125,7 @@ function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
 // Fila de historias arriba del feed, estilo Facebook/Instagram: círculos con
 // las mascotas que publicaron algo en las últimas 24hs, la propia primero,
 // más un botón para agregar una historia nueva (foto o video corto).
-export default function StoriesRow({ showToast }) {
+export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost, onCreatedReel }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewer, setViewer] = useState(null); // { groupIndex, storyIndex }
@@ -132,7 +134,18 @@ export default function StoriesRow({ showToast }) {
   const [editFile, setEditFile] = useState(null);
   const [editUrl, setEditUrl] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [crossPost, setCrossPost] = useState(null); // { kind, file }
+  const [myPet, setMyPet] = useState(null);
   const timerRef = useRef(null);
+
+  // Sólo hace falta para la tarjeta "Crear historia" cuando todavía no
+  // tenés ninguna activa: api.stories() no incluye tu mascota en la lista
+  // en ese caso (no hay nada que mostrarle a los demás todavía), así que
+  // pedimos tu propio perfil aparte para poner tu foto de fondo, como en
+  // Facebook.
+  useEffect(() => {
+    api.me().then((me) => setMyPet(me.pet)).catch(() => {});
+  }, []);
 
   function uploadStoryFile(file, extra) {
     setUploading(true);
@@ -153,10 +166,17 @@ export default function StoriesRow({ showToast }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // El signal cambia cuando OTRA pantalla (feed/reels) crea una historia
+  // desde su propia cámara con la píldora en "Historia" — así esta fila se
+  // entera y se actualiza sola. También carga la primera vez (mount).
+  useEffect(() => { load(); }, [refreshSignal]);
 
-  function handlePickerSelect(file) {
+  function handlePickerSelect(file, destination) {
     setPickerOpen(false);
+    if (destination !== 'story') {
+      setCrossPost({ kind: destination, file });
+      return;
+    }
     // Las fotos se pueden acomodar (recortar) antes de subir; los videos no
     // (recortar un video ya no es un simple "encuadre" como con una
     // imagen). Ambos pasan por el editor de texto/stickers/música antes de
@@ -166,6 +186,12 @@ export default function StoriesRow({ showToast }) {
     } else {
       openEditor(file);
     }
+  }
+
+  function handleCrossPostDone(kind) {
+    setCrossPost(null);
+    if (kind === 'post') onCreatedPost?.();
+    if (kind === 'reel') onCreatedReel?.();
   }
 
   function openEditor(file) {
@@ -238,41 +264,69 @@ export default function StoriesRow({ showToast }) {
   const hasMyStory = myGroupIndex >= 0;
   const others = groups.filter((g) => !g.is_mine);
 
+  // Tarjeta grande con la foto de fondo (como Facebook): usamos la primera
+  // foto de la historia como fondo si es una imagen; si es un video (o
+  // todavía no hay historia propia) mostramos la foto de perfil de la
+  // mascota, y si ni eso hay, el color + dibujito de su especie.
+  function cardBg(group) {
+    const firstStory = group?.stories?.[0];
+    if (firstStory?.media_type === 'image') return { type: 'image', src: firstStory.media_url };
+    if (firstStory?.media_type === 'video') return { type: 'video', src: firstStory.media_url };
+    return null;
+  }
+
   return (
     <div className="stories-row">
-      <div className="story-circle add-story">
-        {/* El anillo de color (como en Instagram) sólo aparece cuando ya hay
-            una historia activa; si no hay, el anillo queda gris y tocar el
-            avatar abre la cámara para crear la primera. */}
-        <div className={`story-avatar-wrap ${hasMyStory ? '' : 'add'}`}>
-          {hasMyStory ? (
-            <span onClick={() => openViewer(myGroupIndex)}>
-              <PetAvatar photoUrl={groups[myGroupIndex].photo_url} species={groups[myGroupIndex].species} color={groups[myGroupIndex].color} size={56} />
-            </span>
-          ) : (
-            <div className="story-avatar-empty" onClick={() => setPickerOpen(true)}>
-              <IconPawSmall size={26} />
-            </div>
-          )}
-          <span
-            className="story-add-badge"
-            onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
-            title="Agregar historia"
-          >
-            {uploading ? '…' : <IconCamera size={15} />}
-          </span>
+      <div className="story-card story-card-add" onClick={() => (hasMyStory ? openViewer(myGroupIndex) : setPickerOpen(true))}>
+        <div className="story-card-media">
+          {(() => {
+            const bg = hasMyStory ? cardBg(groups[myGroupIndex]) : null;
+            const petForBg = hasMyStory ? groups[myGroupIndex] : myPet;
+            if (bg?.type === 'image') return <img src={bg.src} alt="" />;
+            if (bg?.type === 'video') return <video src={bg.src} muted preload="metadata" />;
+            if (petForBg?.photo_url) return <img src={petForBg.photo_url} alt="" />;
+            return (
+              <div className="story-card-fallback" style={{ background: petForBg?.color || 'var(--chip-bg)' }}>
+                <PetIllustration species={petForBg?.species} size={40} />
+              </div>
+            );
+          })()}
         </div>
-        <span className="story-label">Tu historia</span>
+        <div className="story-card-shade" />
+        <button
+          type="button"
+          className="story-card-plus"
+          onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
+          title="Crear historia"
+        >
+          {uploading ? '…' : '+'}
+        </button>
+        <span className="story-card-label">{hasMyStory ? 'Tu historia' : 'Crear historia'}</span>
       </div>
 
       {others.map((g) => {
         const idx = groups.indexOf(g);
+        const bg = cardBg(g);
         return (
-          <div className="story-circle" key={g.pet_id} onClick={() => openViewer(idx)}>
-            <div className="story-avatar-wrap">
-              <PetAvatar photoUrl={g.photo_url} species={g.species} color={g.color} size={56} />
+          <div className="story-card" key={g.pet_id} onClick={() => openViewer(idx)}>
+            <div className="story-card-media">
+              {bg?.type === 'image' ? (
+                <img src={bg.src} alt="" />
+              ) : bg?.type === 'video' ? (
+                <video src={bg.src} muted preload="metadata" />
+              ) : g.photo_url ? (
+                <img src={g.photo_url} alt="" />
+              ) : (
+                <div className="story-card-fallback" style={{ background: g.color }}>
+                  <PetIllustration species={g.species} size={40} />
+                </div>
+              )}
             </div>
-            <span className="story-label">{g.pet_name}</span>
+            <div className="story-card-shade" />
+            <div className="story-card-avatar">
+              <PetAvatar photoUrl={g.photo_url} species={g.species} color={g.color} size={30} />
+            </div>
+            <span className="story-card-label">{g.pet_name}</span>
           </div>
         );
       })}
@@ -293,7 +347,16 @@ export default function StoriesRow({ showToast }) {
           allowedDestinations={['post', 'story', 'reel']}
           onSelect={handlePickerSelect}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {crossPost && (
+        <CrossPostFlow
+          kind={crossPost.kind}
+          file={crossPost.file}
           showToast={showToast}
+          onCancel={() => setCrossPost(null)}
+          onDone={handleCrossPostDone}
         />
       )}
 

@@ -29,8 +29,7 @@ let itemIdCounter = 1;
 
 // Selector de fotos/videos a pantalla completa, estilo Instagram: es lo que
 // se abre al tocar la cámara en el feed, en historias o en el perfil, con
-// la misma pinta en los tres lugares (como pidió el usuario después de
-// mandar una captura de referencia).
+// la misma pinta en los tres lugares.
 //
 // Ojo con una limitación real: un sitio web (ni siquiera instalado como
 // app/PWA) no puede mostrar de entrada una grilla con "tus últimas fotos"
@@ -41,22 +40,20 @@ let itemIdCounter = 1;
 // elegís, esas quedan mostradas en ESTA grilla propia para poder tocar y
 // cambiar cuál usar sin tener que volver a abrir el selector del sistema.
 //
-// El selector de abajo (PUBLICACIÓN/HISTORIA/REEL) muestra en qué tipo de
-// contenido estás parado según desde dónde abriste este selector — no
-// cambia todavía a qué se publica si lo tocás (cada tipo tiene su propio
-// editor después de este paso), así que las otras dos opciones se ven pero
-// no hacen nada por ahora.
+// La píldora de abajo (PUBLICACIÓN/HISTORIA/REEL) es de verdad funcional:
+// tocarla cambia a qué tipo de contenido se manda lo que elijas — el
+// componente que abrió este selector (Feed/Historias) decide qué hacer
+// según el destino que reciba en onSelect(file, destination).
 export default function MediaPickerModal({
-  destination = 'post',
+  destination: initialDestination = 'post',
   allowedDestinations = ['post'],
   onSelect,
-  onClose,
-  showToast
+  onClose
 }) {
+  const [destination, setDestination] = useState(initialDestination);
   const [activeTab, setActiveTab] = useState('recientes');
-  const [multiSelect, setMultiSelect] = useState(false);
   const [items, setItems] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
@@ -67,6 +64,17 @@ export default function MediaPickerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Si cambiás de PUBLICACIÓN a REEL (por ejemplo) y lo que tenías elegido
+  // era una foto, esa selección ya no vale para el nuevo tipo — la
+  // soltamos para no confirmar por error algo que no corresponde.
+  useEffect(() => {
+    setSelectedId((id) => {
+      const item = items.find((it) => it.id === id);
+      return item && fitsDestination(item, destination) ? id : null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination]);
+
   function addFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
@@ -74,11 +82,10 @@ export default function MediaPickerModal({
       id: itemIdCounter++,
       file,
       url: URL.createObjectURL(file),
-      kind: file.type.startsWith('video/') ? 'video' : 'image',
-      duration: null
+      kind: file.type.startsWith('video/') ? 'video' : 'image'
     }));
     setItems((prev) => [...newItems, ...prev]);
-    setSelectedIds(multiSelect ? (prev) => [...prev, ...newItems.map((i) => i.id)] : newItems.slice(0, 1).map((i) => i.id));
+    setSelectedId(newItems[0].id);
   }
 
   function handleGalleryChange(e) {
@@ -91,25 +98,13 @@ export default function MediaPickerModal({
     e.target.value = '';
   }
 
-  function toggleSelect(id) {
-    if (multiSelect) {
-      setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    } else {
-      setSelectedIds([id]);
-    }
-  }
-
   function handleConfirm() {
-    if (!selectedIds.length) return;
-    if (selectedIds.length > 1) {
-      showToast?.('Por ahora se puede publicar una foto o un video a la vez — vamos a usar el primero que elegiste');
-    }
-    const chosen = items.find((it) => it.id === selectedIds[0]);
+    const chosen = items.find((it) => it.id === selectedId);
     if (!chosen) return;
     onSelect(chosen.file, destination);
   }
 
-  const previewItem = items.find((it) => it.id === selectedIds[0]);
+  const previewItem = items.find((it) => it.id === selectedId);
   const visibleItems = items.filter((it) => fitsDestination(it, destination));
   const showSwitcher = allowedDestinations.length > 1;
 
@@ -124,7 +119,7 @@ export default function MediaPickerModal({
           type="button"
           className="picker-icon-btn picker-next-btn"
           onClick={handleConfirm}
-          disabled={!selectedIds.length}
+          disabled={!selectedId}
           aria-label="Siguiente"
         >
           <IconChevronRight size={24} />
@@ -163,13 +158,6 @@ export default function MediaPickerModal({
             Borradores
           </button>
         </div>
-        <button
-          type="button"
-          className={`picker-select-pill ${multiSelect ? 'active' : ''}`}
-          onClick={() => setMultiSelect((v) => !v)}
-        >
-          Seleccionar
-        </button>
       </div>
 
       {activeTab === 'recientes' ? (
@@ -182,13 +170,13 @@ export default function MediaPickerModal({
             <span>Elegir</span>
           </button>
           {visibleItems.map((it) => {
-            const selected = selectedIds.includes(it.id);
+            const selected = it.id === selectedId;
             return (
               <button
                 type="button"
                 key={it.id}
                 className={`picker-grid-tile picker-thumb ${selected ? 'selected' : ''}`}
-                onClick={() => toggleSelect(it.id)}
+                onClick={() => setSelectedId(it.id)}
               >
                 {it.kind === 'video' ? (
                   <VideoThumb url={it.url} />
@@ -211,9 +199,14 @@ export default function MediaPickerModal({
         <div className="picker-dest-pill-row">
           <div className="picker-dest-pill">
             {allowedDestinations.map((d) => (
-              <span key={d} className={d === destination ? 'active' : ''}>
+              <button
+                key={d}
+                type="button"
+                className={d === destination ? 'active' : ''}
+                onClick={() => setDestination(d)}
+              >
                 {DEST_LABELS[d]}
-              </span>
+              </button>
             ))}
           </div>
         </div>
@@ -223,7 +216,6 @@ export default function MediaPickerModal({
         ref={galleryInputRef}
         type="file"
         accept={acceptFor(destination)}
-        multiple={multiSelect}
         style={{ display: 'none' }}
         onChange={handleGalleryChange}
       />

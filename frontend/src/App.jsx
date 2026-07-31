@@ -50,6 +50,13 @@ function App() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [messagesInitialPetId, setMessagesInitialPetId] = useState(null);
   const [tabbarHidden, setTabbarHidden] = useState(false);
+  // Cuando el selector de fotos de una pantalla crea contenido de OTRO tipo
+  // (por ejemplo, elegís "Historia" desde la cámara del feed), esa otra
+  // pantalla no se entera sola — bumpeamos un contador que cada una mira
+  // para recargar su lista (ver refreshSignal más abajo y CrossPostFlow).
+  const [feedRefreshTick, setFeedRefreshTick] = useState(0);
+  const [storiesRefreshTick, setStoriesRefreshTick] = useState(0);
+  const [reelsRefreshTick, setReelsRefreshTick] = useState(0);
   const mainRef = useRef(null);
   const navRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -243,11 +250,26 @@ function App() {
           <>
             {tab === 'feed' && (
               <>
-                <StoriesRow showToast={showToast} />
-                <FeedView showToast={showToast} searchQuery={searchQuery} onViewPet={setViewingPetId} scrollContainerRef={mainRef} />
+                <StoriesRow
+                  showToast={showToast}
+                  refreshSignal={storiesRefreshTick}
+                  onCreatedPost={() => setFeedRefreshTick((t) => t + 1)}
+                  onCreatedReel={() => setReelsRefreshTick((t) => t + 1)}
+                />
+                <FeedView
+                  showToast={showToast}
+                  searchQuery={searchQuery}
+                  onViewPet={setViewingPetId}
+                  scrollContainerRef={mainRef}
+                  refreshSignal={feedRefreshTick}
+                  onCreatedStory={() => setStoriesRefreshTick((t) => t + 1)}
+                  onCreatedReel={() => setReelsRefreshTick((t) => t + 1)}
+                />
               </>
             )}
-            {tab === 'reels' && <ReelsView showToast={showToast} onViewPet={setViewingPetId} />}
+            {tab === 'reels' && (
+              <ReelsView showToast={showToast} onViewPet={setViewingPetId} refreshSignal={reelsRefreshTick} />
+            )}
             {tab === 'requests' && <RequestsView showToast={showToast} onViewPet={setViewingPetId} />}
             {tab === 'nearby' && <NearbyView showToast={showToast} searchQuery={searchQuery} onViewPet={setViewingPetId} />}
             {tab === 'notifications' && (

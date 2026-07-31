@@ -121,7 +121,7 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
   );
 }
 
-export default function ReelsView({ showToast, onViewPet }) {
+export default function ReelsView({ showToast, onViewPet, refreshSignal = 0 }) {
   const [reels, setReels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -145,7 +145,10 @@ export default function ReelsView({ showToast, onViewPet }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // El signal cambia cuando OTRA pantalla (feed/historias) crea un reel
+  // desde su propia cámara con la píldora en "Reel" — así esta lista se
+  // entera y se actualiza sola. También carga la primera vez (mount).
+  useEffect(() => { load(); }, [refreshSignal]);
 
   function handlePickVideo(e) {
     const file = e.target.files?.[0];
