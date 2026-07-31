@@ -83,6 +83,10 @@ export const api = {
   },
   sharePost: (postId, caption) => request(`/api/posts/${postId}/share`, { method: 'POST', body: JSON.stringify({ caption }) }),
 
+  toggleFollow: (petId) => request(`/api/pets/${petId}/follow`, { method: 'POST' }),
+  petFollowers: (petId) => request(`/api/pets/${petId}/followers`),
+  petFollowing: (petId) => request(`/api/pets/${petId}/following`),
+
   stories: () => request('/api/stories'),
   createStory: (mediaFile) => {
     const form = new FormData();
@@ -103,5 +107,10 @@ export const api = {
   respondPlaydate: (id, status) => request(`/api/playdates/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 
   notifications: () => request('/api/notifications'),
-  markNotificationsRead: () => request('/api/notifications/read', { method: 'POST' })
+  markNotificationsRead: () => request('/api/notifications/read', { method: 'POST' }),
+
+  conversations: () => request('/api/conversations'),
+  unreadMessagesCount: () => request('/api/conversations/unread-count'),
+  conversationMessages: (petId) => request(`/api/conversations/${petId}/messages`),
+  sendMessage: (petId, body) => request(`/api/conversations/${petId}/messages`, { method: 'POST', body: JSON.stringify({ body }) })
 };

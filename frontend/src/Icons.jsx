@@ -125,6 +125,17 @@ export function IconUpload({ size = 16 }) {
   );
 }
 
+export function IconAddUser({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="10" cy="8.3" r="3.3" />
+      <path d="M3.8 19c0.9-3 3.4-4.6 6.2-4.6 1 0 1.9 0.2 2.8 0.6" />
+      <path d="M18 8.5v6" />
+      <path d="M15 11.5h6" />
+    </svg>
+  );
+}
+
 export function IconPawSmall({ size = 22 }) {
   return (
     <svg {...COMMON} width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">

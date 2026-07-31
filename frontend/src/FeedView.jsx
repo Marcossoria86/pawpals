@@ -5,6 +5,7 @@ import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import MediaPicker from './MediaPicker';
+import ImageCropper from './ImageCropper';
 import { IconHeart, IconShare } from './Icons';
 
 function timeAgo(isoLike) {
@@ -30,6 +31,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
   const [shareCaption, setShareCaption] = useState('');
   const [sharing, setSharing] = useState(false);
   const [composeHidden, setComposeHidden] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
   const lastScrollY = useRef(0);
 
   async function load() {
@@ -73,8 +75,15 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
       showToast('Ese archivo no es una imagen');
       return;
     }
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    // Antes de subirla, dejamos que la acomode dentro del marco (recorte)
+    // para que vea exactamente cómo va a quedar en el feed.
+    setCropFile(file);
+  }
+
+  function handleCropConfirm(croppedFile) {
+    setPhotoFile(croppedFile);
+    setPhotoPreview(URL.createObjectURL(croppedFile));
+    setCropFile(null);
   }
 
   function clearPhoto() {
@@ -284,6 +293,16 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
             </div>
           </div>
         </div>
+      )}
+
+      {cropFile && (
+        <ImageCropper
+          file={cropFile}
+          aspect={4 / 3}
+          title="Acomodá la foto de tu publicación"
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
       )}
     </section>
   );

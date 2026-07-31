@@ -24,7 +24,11 @@ html,body{
 }
 body{
   margin:0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background:#ded8ca;
   color: var(--ink);
 }
+/* Fredoka viene en pesos 400/500/600/700 — mapeamos los "bold" del navegador
+   (que por defecto pedirían 700 sintético) a lo que realmente tenemos, para
+   que el texto en negrita no se vea deforme. */
+b, strong{ font-weight:600; }

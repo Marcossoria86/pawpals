@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
-import { IconHeart, IconComment, IconShare, IconPawSmall, IconCheck, IconClose } from './Icons';
+import { IconHeart, IconComment, IconShare, IconPawSmall, IconCheck, IconClose, IconAddUser } from './Icons';
 import { IconBell } from './NavIcons';
 
 function timeAgo(isoLike) {
@@ -25,6 +25,7 @@ function messageFor(n) {
     case 'playdate_request': return `${who} te envió una solicitud de cita de juego`;
     case 'playdate_accepted': return `${who} aceptó tu solicitud de cita de juego`;
     case 'playdate_declined': return `${who} rechazó tu solicitud de cita de juego`;
+    case 'follow': return `${who} empezó a seguirte`;
     default: return `${who} interactuó contigo`;
   }
 }
@@ -37,6 +38,7 @@ function iconFor(type) {
     case 'playdate_request': return <IconPawSmall size={17} />;
     case 'playdate_accepted': return <IconCheck size={16} />;
     case 'playdate_declined': return <IconClose size={16} />;
+    case 'follow': return <IconAddUser size={16} />;
     default: return <IconBell />;
   }
 }

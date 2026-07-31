@@ -132,6 +132,19 @@ function ownerIdOfPet(petId) {
   return row ? row.owner_id : null;
 }
 
+function followerCount(petId) {
+  return db.prepare('SELECT COUNT(*) AS c FROM follows WHERE followed_pet_id = ?').get(petId).c;
+}
+function followingCount(petId) {
+  return db.prepare('SELECT COUNT(*) AS c FROM follows WHERE follower_pet_id = ?').get(petId).c;
+}
+function isFollowing(followerPetId, followedPetId) {
+  if (!followerPetId) return false;
+  return !!db
+    .prepare('SELECT 1 FROM follows WHERE follower_pet_id = ? AND followed_pet_id = ?')
+    .get(followerPetId, followedPetId);
+}
+
 // ---------- AUTH ----------
 
 app.post('/api/auth/register', (req, res) => {
@@ -206,7 +219,13 @@ app.get('/api/me', requireAuth, (req, res) => {
   res.json({
     user,
     pet: { ...pet, photo_url: absoluteUploadUrl(req, pet.photo_path) },
-    stats: { posts: postsCount, playdates: playdatesCount, friends: friendsCount }
+    stats: {
+      posts: postsCount,
+      playdates: playdatesCount,
+      friends: friendsCount,
+      followers: followerCount(pet.id),
+      following: followingCount(pet.id)
+    }
   });
 });
 
@@ -255,8 +274,69 @@ app.get('/api/pets/:id', requireAuth, (req, res) => {
     is_me: !!myPet && myPet.id === pet.id,
     distance_km: distanceKm,
     playdate_status: playdateStatus,
-    stats: { posts: postsCount }
+    is_following: myPet && myPet.id !== pet.id ? isFollowing(myPet.id, pet.id) : false,
+    stats: { posts: postsCount, followers: followerCount(pet.id), following: followingCount(pet.id) }
   });
+});
+
+// ---------- SEGUIDORES ----------
+
+app.post('/api/pets/:id/follow', requireAuth, (req, res) => {
+  const targetId = Number(req.params.id);
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.status(400).json({ error: 'Todavía no tienes una mascota configurada' });
+  if (myPet.id === targetId) return res.status(400).json({ error: 'No puedes seguirte a ti mismo' });
+  const targetPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(targetId);
+  if (!targetPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+
+  const already = isFollowing(myPet.id, targetId);
+  if (already) {
+    db.prepare('DELETE FROM follows WHERE follower_pet_id = ? AND followed_pet_id = ?').run(myPet.id, targetId);
+  } else {
+    db.prepare('INSERT INTO follows (follower_pet_id, followed_pet_id) VALUES (?, ?)').run(myPet.id, targetId);
+    notify(targetPet.owner_id, req.userId, myPet.id, 'follow', {});
+  }
+
+  res.json({ following: !already, followers_count: followerCount(targetId) });
+});
+
+function petListWithFollowInfo(pets, myPetId) {
+  return pets.map((p) => ({
+    pet_id: p.id,
+    pet_name: p.name,
+    species: p.species,
+    color: p.color,
+    breed: p.breed,
+    photo_url: p.photo_url,
+    is_me: myPetId === p.id,
+    is_following: myPetId ? isFollowing(myPetId, p.id) : false
+  }));
+}
+
+app.get('/api/pets/:id/followers', requireAuth, (req, res) => {
+  const petId = Number(req.params.id);
+  const myPet = getPetByOwner(req.userId);
+  const rows = db
+    .prepare(
+      `SELECT pets.* FROM follows JOIN pets ON pets.id = follows.follower_pet_id
+       WHERE follows.followed_pet_id = ? ORDER BY follows.created_at DESC`
+    )
+    .all(petId)
+    .map((p) => ({ ...p, photo_url: absoluteUploadUrl(req, p.photo_path) }));
+  res.json(petListWithFollowInfo(rows, myPet ? myPet.id : null));
+});
+
+app.get('/api/pets/:id/following', requireAuth, (req, res) => {
+  const petId = Number(req.params.id);
+  const myPet = getPetByOwner(req.userId);
+  const rows = db
+    .prepare(
+      `SELECT pets.* FROM follows JOIN pets ON pets.id = follows.followed_pet_id
+       WHERE follows.follower_pet_id = ? ORDER BY follows.created_at DESC`
+    )
+    .all(petId)
+    .map((p) => ({ ...p, photo_url: absoluteUploadUrl(req, p.photo_path) }));
+  res.json(petListWithFollowInfo(rows, myPet ? myPet.id : null));
 });
 
 // ---------- FEED ----------
@@ -693,6 +773,126 @@ app.post('/api/posts/:id/share', requireAuth, (req, res) => {
   notify(original.owner_id, req.userId, myPet.id, 'share', { postId: rootId });
 
   res.json({ id: info.lastInsertRowid });
+});
+
+// ---------- MENSAJES ----------
+// Mensajería directa mascota-a-mascota (como los DM de Instagram): cualquier
+// mascota le puede escribir a cualquier otra, sin pedir "amistad" primero,
+// igual que ya se puede comentar o proponer una cita de juego sin pedir
+// permiso antes.
+
+app.get('/api/conversations', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.json([]);
+
+  const rows = db
+    .prepare('SELECT * FROM messages WHERE sender_pet_id = ? OR recipient_pet_id = ? ORDER BY created_at ASC')
+    .all(myPet.id, myPet.id);
+
+  // Agrupamos en JS en vez de con SQL más elaborado (ventanas/CTEs): con el
+  // volumen de mensajes de una app como esta alcanza de sobra y es mucho
+  // más fácil de seguir.
+  const byPartner = new Map();
+  for (const m of rows) {
+    const partnerId = m.sender_pet_id === myPet.id ? m.recipient_pet_id : m.sender_pet_id;
+    const entry = byPartner.get(partnerId) || { last: null, unread: 0 };
+    entry.last = m; // vienen ordenados ASC, así que el último en pisar es el más nuevo
+    if (m.recipient_pet_id === myPet.id && !m.is_read) entry.unread += 1;
+    byPartner.set(partnerId, entry);
+  }
+
+  const partnerIds = [...byPartner.keys()];
+  if (partnerIds.length === 0) return res.json([]);
+
+  const placeholders = partnerIds.map(() => '?').join(',');
+  const pets = db.prepare(`SELECT * FROM pets WHERE id IN (${placeholders})`).all(...partnerIds);
+  const petById = new Map(pets.map((p) => [p.id, p]));
+
+  const list = partnerIds
+    .map((id) => {
+      const pet = petById.get(id);
+      const entry = byPartner.get(id);
+      if (!pet) return null;
+      return {
+        pet_id: pet.id,
+        pet_name: pet.name,
+        species: pet.species,
+        color: pet.color,
+        photo_url: absoluteUploadUrl(req, pet.photo_path),
+        last_message: entry.last.body,
+        last_message_at: entry.last.created_at,
+        last_message_is_mine: entry.last.sender_pet_id === myPet.id,
+        unread_count: entry.unread
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1));
+
+  res.json(list);
+});
+
+app.get('/api/conversations/unread-count', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.json({ count: 0 });
+  const row = db.prepare('SELECT COUNT(*) AS c FROM messages WHERE recipient_pet_id = ? AND is_read = 0').get(myPet.id);
+  res.json({ count: row.c });
+});
+
+app.get('/api/conversations/:petId/messages', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.status(400).json({ error: 'Todavía no tienes una mascota configurada' });
+  const partnerId = Number(req.params.petId);
+  const partnerPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(partnerId);
+  if (!partnerPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+
+  db.prepare('UPDATE messages SET is_read = 1 WHERE recipient_pet_id = ? AND sender_pet_id = ? AND is_read = 0').run(
+    myPet.id,
+    partnerId
+  );
+
+  const rows = db
+    .prepare(
+      `SELECT * FROM messages
+       WHERE (sender_pet_id = ? AND recipient_pet_id = ?) OR (sender_pet_id = ? AND recipient_pet_id = ?)
+       ORDER BY created_at ASC`
+    )
+    .all(myPet.id, partnerId, partnerId, myPet.id);
+
+  res.json({
+    partner: {
+      pet_id: partnerPet.id,
+      pet_name: partnerPet.name,
+      species: partnerPet.species,
+      color: partnerPet.color,
+      photo_url: absoluteUploadUrl(req, partnerPet.photo_path)
+    },
+    messages: rows.map((m) => ({
+      id: m.id,
+      body: m.body,
+      is_mine: m.sender_pet_id === myPet.id,
+      created_at: m.created_at
+    }))
+  });
+});
+
+app.post('/api/conversations/:petId/messages', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.status(400).json({ error: 'Todavía no tienes una mascota configurada' });
+  const partnerId = Number(req.params.petId);
+  if (partnerId === myPet.id) return res.status(400).json({ error: 'No puedes enviarte un mensaje a ti mismo' });
+  const partnerPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(partnerId);
+  if (!partnerPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+
+  const body = ((req.body && req.body.body) || '').trim();
+  if (!body) return res.status(400).json({ error: 'Escribe un mensaje' });
+  if (body.length > 2000) return res.status(400).json({ error: 'El mensaje es demasiado largo' });
+
+  const info = db
+    .prepare('INSERT INTO messages (sender_pet_id, recipient_pet_id, body) VALUES (?, ?, ?)')
+    .run(myPet.id, partnerId, body);
+  const created = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
+
+  res.json({ id: created.id, body: created.body, is_mine: true, created_at: created.created_at });
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));

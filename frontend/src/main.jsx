@@ -1,5 +1,13 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Tipografía propia (Fredoka, redondeada y con personalidad) en vez de la
+// fuente del sistema — así se siente una app, no una página web genérica.
+// La traemos empaquetada vía npm (@fontsource) en vez de desde Google Fonts
+// directo: queda incluida en el build y funciona offline en la app nativa.
+import '@fontsource/fredoka/400.css'
+import '@fontsource/fredoka/500.css'
+import '@fontsource/fredoka/600.css'
+import '@fontsource/fredoka/700.css'
 import './index.css'
 import App from './App.jsx'
 

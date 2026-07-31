@@ -10,7 +10,8 @@ import StoriesRow from './StoriesRow';
 import ReelsView from './ReelsView';
 import RequestsView from './RequestsView';
 import NotificationsView from './NotificationsView';
-import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile } from './NavIcons';
+import MessagesView from './MessagesView';
+import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
 import { IconSearch, IconClose, IconPawSmall } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
@@ -36,6 +37,8 @@ function App() {
   const [viewingPetId, setViewingPetId] = useState(null);
   const [me, setMe] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [messagesInitialPetId, setMessagesInitialPetId] = useState(null);
   const mainRef = useRef(null);
 
   function toggleSearch() {
@@ -51,6 +54,11 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+    // selectTab es la navegación "normal" (tabs de abajo, ícono de mensajes
+    // del header): siempre entra a la bandeja por la lista. Sólo
+    // goToMessages (desde "Enviar mensaje" en un perfil) abre directo una
+    // conversación puntual.
+    setMessagesInitialPetId(null);
   }
 
   // Tocar las patitas / "PawPals" del header vuelve al feed y lo desplaza
@@ -59,6 +67,7 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+    setMessagesInitialPetId(null);
     setTab('feed');
     requestAnimationFrame(() => {
       mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -76,6 +85,22 @@ function App() {
       .catch(() => {});
   }, []);
 
+  const refreshUnreadMessages = useCallback(() => {
+    api.unreadMessagesCount()
+      .then((r) => setUnreadMessages(r.count))
+      .catch(() => {});
+  }, []);
+
+  // Vamos a la bandeja de mensajes y abrimos directo la conversación con
+  // esa mascota — se usa desde el botón "Enviar mensaje" de un perfil.
+  function goToMessages(petId) {
+    setViewingPetId(null);
+    setSearchOpen(false);
+    setSearchQuery('');
+    setTab('messages');
+    setMessagesInitialPetId(petId);
+  }
+
   useEffect(() => {
     api.me()
       .then(() => setAuthenticated(true))
@@ -87,9 +112,10 @@ function App() {
     if (!authenticated) return undefined;
     api.me().then(setMe).catch(() => {});
     refreshUnread();
-    const interval = setInterval(refreshUnread, 20000);
+    refreshUnreadMessages();
+    const interval = setInterval(() => { refreshUnread(); refreshUnreadMessages(); }, 20000);
     return () => clearInterval(interval);
-  }, [authenticated, refreshUnread]);
+  }, [authenticated, refreshUnread, refreshUnreadMessages]);
 
   if (!authChecked) {
     return <div className="loading-screen">Cargando PawPals…</div>;
@@ -121,14 +147,22 @@ function App() {
         {searchableTab && (
           <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={16} /> : <IconSearch size={16} />}</div>
         )}
+        {!searchOpen && tab !== 'messages' && (
+          <button type="button" className="icon-btn messages-icon-btn" onClick={() => selectTab('messages')} title="Mensajes" aria-label="Mensajes">
+            <IconMessages size={18} />
+            {unreadMessages > 0 && <span className="tab-badge header-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}
+          </button>
+        )}
       </header>
 
-      <main ref={mainRef} className={tab === 'reels' ? 'no-pad' : ''}>
+      <main ref={mainRef} className={tab === 'reels' || tab === 'messages' ? 'no-pad' : ''}>
         {viewingPetId ? (
           <PetProfileView
             petId={viewingPetId}
             showToast={showToast}
             onBack={() => setViewingPetId(null)}
+            onViewPet={setViewingPetId}
+            onMessagePet={goToMessages}
           />
         ) : (
           <>
@@ -144,7 +178,14 @@ function App() {
             {tab === 'notifications' && (
               <NotificationsView showToast={showToast} onViewPet={setViewingPetId} onRead={() => setUnreadCount(0)} />
             )}
-            {tab === 'profile' && <ProfileView showToast={showToast} onLogout={() => setAuthenticated(false)} />}
+            {tab === 'messages' && (
+              <MessagesView
+                showToast={showToast}
+                initialPetId={messagesInitialPetId}
+                onRefreshUnread={refreshUnreadMessages}
+              />
+            )}
+            {tab === 'profile' && <ProfileView showToast={showToast} onLogout={() => setAuthenticated(false)} onViewPet={setViewingPetId} />}
           </>
         )}
       </main>

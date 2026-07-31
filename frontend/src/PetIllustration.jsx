@@ -30,15 +30,27 @@ function Dog() {
 function Cat() {
   return (
     <svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
-      <path d="M14 14 L24 28 L12 30 Z" fill="#4f7d6b" />
-      <path d="M50 14 L40 28 L52 30 Z" fill="#4f7d6b" />
-      <circle cx="32" cy="36" r="19" fill="#f4d9c6" />
-      <ellipse cx="23" cy="34" rx="3" ry="3.6" fill={FACE} />
-      <ellipse cx="41" cy="34" rx="3" ry="3.6" fill={FACE} />
-      <path d="M32 40 l-3 3 h6 z" fill="#c9683f" />
-      <path d="M14 30 q6 4 4 9" stroke={FACE} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <path d="M50 30 q-6 4 -4 9" stroke={FACE} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <path d="M26 46 q6 4 12 0" stroke={FACE} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* orejas, con la parte interna más clara para dar volumen */}
+      <path d="M16 20 L22 6 L28 22 Z" fill="#d98a4f" />
+      <path d="M48 20 L42 6 L36 22 Z" fill="#d98a4f" />
+      <path d="M18.5 18 L22.5 10 L26 19 Z" fill="#f3c9a0" />
+      <path d="M45.5 18 L41.5 10 L38 19 Z" fill="#f3c9a0" />
+      {/* mejillas, para que la cara no quede un círculo plano */}
+      <ellipse cx="18" cy="40" rx="10" ry="9" fill="#d98a4f" />
+      <ellipse cx="46" cy="40" rx="10" ry="9" fill="#d98a4f" />
+      <circle cx="32" cy="35" r="19" fill="#e8a869" />
+      <ellipse cx="32" cy="43" rx="11" ry="8" fill="#f8e6d1" />
+      <ellipse cx="24" cy="33" rx="3.4" ry="4.2" fill={FACE} />
+      <ellipse cx="40" cy="33" rx="3.4" ry="4.2" fill={FACE} />
+      <circle cx="25.2" cy="31.3" r="1" fill="#fff" />
+      <circle cx="41.2" cy="31.3" r="1" fill="#fff" />
+      <path d="M32 40 l-2.6 2.6 h5.2 z" fill="#c9683f" />
+      <path d="M32 42.6 q-4 4 -8 1.4" stroke={FACE} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <path d="M32 42.6 q4 4 8 1.4" stroke={FACE} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <path d="M10 38 q6 1 10 3" stroke={FACE} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.55" />
+      <path d="M10 44 q6 -1 10 -1" stroke={FACE} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.55" />
+      <path d="M54 38 q-6 1 -10 3" stroke={FACE} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.55" />
+      <path d="M54 44 q-6 -1 -10 -1" stroke={FACE} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.55" />
     </svg>
   );
 }

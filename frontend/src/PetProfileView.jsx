@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import FollowListModal from './FollowListModal';
+import { IconComment, IconAddUser, IconCheck } from './Icons';
 
-export default function PetProfileView({ petId, onBack, showToast }) {
+export default function PetProfileView({ petId, onBack, showToast, onMessagePet, onViewPet }) {
   const [data, setData] = useState(null);
   const [requesting, setRequesting] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [listModal, setListModal] = useState(null); // 'followers' | 'following' | null
 
   useEffect(() => {
     setData(null);
@@ -24,9 +28,26 @@ export default function PetProfileView({ petId, onBack, showToast }) {
     }
   }
 
+  async function handleToggleFollow() {
+    setFollowBusy(true);
+    try {
+      const result = await api.toggleFollow(petId);
+      setData((prev) => ({
+        ...prev,
+        is_following: result.following,
+        stats: { ...prev.stats, followers: result.followers_count }
+      }));
+      showToast(result.following ? '¡Ahora seguís a esta mascota!' : 'Dejaste de seguir a esta mascota');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setFollowBusy(false);
+    }
+  }
+
   if (!data) return <div className="section-title">Cargando perfil…</div>;
 
-  const { pet, owner_name, distance_km, playdate_status, is_me, stats } = data;
+  const { pet, owner_name, distance_km, playdate_status, is_me, is_following, stats } = data;
 
   return (
     <section>
@@ -40,7 +61,28 @@ export default function PetProfileView({ petId, onBack, showToast }) {
         )}
         <div className="stat-row">
           <div className="stat"><b>{stats.posts}</b><span>publicaciones</span></div>
+          <button type="button" className="stat stat-btn" onClick={() => setListModal('followers')}>
+            <b>{stats.followers}</b><span>seguidores</span>
+          </button>
+          <button type="button" className="stat stat-btn" onClick={() => setListModal('following')}>
+            <b>{stats.following}</b><span>siguiendo</span>
+          </button>
         </div>
+        {!is_me && (
+          <div className="profile-action-row">
+            <button
+              type="button"
+              className={`match-btn ${is_following ? 'sent' : ''}`}
+              disabled={followBusy}
+              onClick={handleToggleFollow}
+            >
+              {is_following ? <><IconCheck size={15} /> Siguiendo</> : <><IconAddUser size={15} /> Seguir</>}
+            </button>
+            <button type="button" className="match-btn" onClick={() => onMessagePet?.(petId)}>
+              <IconComment size={15} /> Enviar mensaje
+            </button>
+          </div>
+        )}
         {!is_me && (
           <button
             className={`match-btn profile-match-btn ${playdate_status ? 'sent' : ''}`}
@@ -53,6 +95,16 @@ export default function PetProfileView({ petId, onBack, showToast }) {
       </div>
       <div className="section-title">Sobre {pet.name}</div>
       <div className="bio-box">{pet.bio || 'Todavía no hay una biografía para esta mascota.'}</div>
+
+      {listModal && (
+        <FollowListModal
+          petId={petId}
+          kind={listModal}
+          onClose={() => setListModal(null)}
+          onViewPet={(id) => { setListModal(null); onViewPet?.(id); }}
+          showToast={showToast}
+        />
+      )}
     </section>
   );
 }

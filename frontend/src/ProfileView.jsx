@@ -1,11 +1,15 @@
 import { useRef, useState, useEffect } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
+import ImageCropper from './ImageCropper';
+import FollowListModal from './FollowListModal';
 import { IconCamera, IconGallery } from './Icons';
 
-export default function ProfileView({ onLogout, showToast }) {
+export default function ProfileView({ onLogout, showToast, onViewPet }) {
   const [me, setMe] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
+  const [listModal, setListModal] = useState(null);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
@@ -18,23 +22,28 @@ export default function ProfileView({ onLogout, showToast }) {
     onLogout();
   }
 
-  async function handlePickPhoto(e) {
+  function handlePickPhoto(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       showToast('Ese archivo no es una imagen');
       return;
     }
+    setCropFile(file);
+  }
+
+  async function handleCropConfirm(croppedFile) {
+    setCropFile(null);
     setUploading(true);
     try {
-      const result = await api.uploadPetPhoto(file);
+      const result = await api.uploadPetPhoto(croppedFile);
       setMe((prev) => ({ ...prev, pet: { ...prev.pet, photo_url: result.photo_url } }));
       showToast('¡Foto de perfil actualizada!');
     } catch (err) {
       showToast(err.message);
     } finally {
       setUploading(false);
-      e.target.value = '';
     }
   }
 
@@ -85,13 +94,39 @@ export default function ProfileView({ onLogout, showToast }) {
         <div className="profile-sub">{pet.breed} · {pet.age ?? '?'} años · dueño/a: {user.name}</div>
         <div className="stat-row">
           <div className="stat"><b>{stats.posts}</b><span>publicaciones</span></div>
-          <div className="stat"><b>{stats.friends}</b><span>mascotas cerca</span></div>
+          <button type="button" className="stat stat-btn" onClick={() => setListModal('followers')}>
+            <b>{stats.followers}</b><span>seguidores</span>
+          </button>
+          <button type="button" className="stat stat-btn" onClick={() => setListModal('following')}>
+            <b>{stats.following}</b><span>siguiendo</span>
+          </button>
           <div className="stat"><b>{stats.playdates}</b><span>citas de juego</span></div>
         </div>
       </div>
       <div className="section-title">Sobre {pet.name}</div>
       <div className="bio-box">{pet.bio || 'Todavía no hay una biografía para esta mascota.'}</div>
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
+
+      {cropFile && (
+        <ImageCropper
+          file={cropFile}
+          aspect={1}
+          shape="circle"
+          title="Acomodá tu foto de perfil"
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
+
+      {listModal && (
+        <FollowListModal
+          petId={pet.id}
+          kind={listModal}
+          onClose={() => setListModal(null)}
+          onViewPet={(id) => { setListModal(null); onViewPet?.(id); }}
+          showToast={showToast}
+        />
+      )}
     </section>
   );
 }

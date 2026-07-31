@@ -4,12 +4,12 @@
 // de marca cuando está activo) sin necesitar props extra ni duplicar reglas.
 
 const COMMON = {
-  width: 22,
-  height: 22,
+  width: 25,
+  height: 25,
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 1.8,
+  strokeWidth: 2.1,
   strokeLinecap: 'round',
   strokeLinejoin: 'round'
 };
@@ -58,6 +58,15 @@ export function IconBell() {
     <svg {...COMMON} aria-hidden="true">
       <path d="M6 10.5a6 6 0 0 1 12 0c0 3.6 1.2 5 1.9 5.7H4.1c.7-.7 1.9-2.1 1.9-5.7Z" />
       <path d="M10.2 19a1.9 1.9 0 0 0 3.6 0" />
+    </svg>
+  );
+}
+
+export function IconMessages({ size } = {}) {
+  return (
+    <svg {...COMMON} {...(size ? { width: size, height: size } : {})} aria-hidden="true">
+      <path d="M4.5 4.5 19.5 12 4.5 19.5 8 12Z" strokeLinejoin="round" />
+      <path d="M8 12h7" />
     </svg>
   );
 }
