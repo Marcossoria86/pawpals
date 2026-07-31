@@ -136,6 +136,49 @@ export function IconAddUser({ size = 20 }) {
   );
 }
 
+export function IconText({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M4 6.5h9" />
+      <path d="M8.5 6.5v11" />
+      <path d="M14.5 12h5.5" />
+      <path d="M17.2 12v5.5" />
+      <path d="M15.3 9.8 17.2 12l1.9-2.2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconSticker({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="10" r="1" fill="currentColor" stroke="none" />
+      <path d="M8.5 14c0.9 1.2 2.1 1.8 3.5 1.8s2.6-0.6 3.5-1.8" />
+    </svg>
+  );
+}
+
+export function IconMusic({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M9 17.5V6l10-1.8V15" strokeLinejoin="round" />
+      <circle cx="6.5" cy="17.5" r="2.5" />
+      <circle cx="16.5" cy="15" r="2.5" />
+    </svg>
+  );
+}
+
+export function IconTrash({ size = 18 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M5 7h14" />
+      <path d="M9 7V5.3A1.3 1.3 0 0 1 10.3 4h3.4A1.3 1.3 0 0 1 15 5.3V7" />
+      <path d="M6.5 7 7.3 19a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7" />
+    </svg>
+  );
+}
+
 export function IconPawSmall({ size = 22 }) {
   return (
     <svg {...COMMON} width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">

@@ -3,7 +3,39 @@ import { createPortal } from 'react-dom';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import ImageCropper from './ImageCropper';
+import MediaEditor from './MediaEditor';
+import OverlayLayer from './OverlayLayer';
+import { musicUrl } from './musicCatalog';
 import { IconCamera, IconGallery, IconClose, IconPawSmall, IconVolume } from './Icons';
+
+// Música de fondo de una historia de foto (sólo aplica a fotos: un video ya
+// trae su propio audio). Mismo patrón que StoryVideo: "muted" a mano sobre
+// el elemento real y un botón para (des)silenciar, así el navegador no
+// bloquea el autoplay por no ser un gesto directo del usuario.
+function StoryAudio({ musicKey }) {
+  const audioRef = useRef(null);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.muted = muted;
+    el.play().catch(() => {});
+  }, [muted, musicKey]);
+
+  return (
+    <>
+      <audio ref={audioRef} src={musicUrl(musicKey)} autoPlay loop muted={muted} />
+      <button
+        type="button"
+        className="story-mute-btn story-music-btn"
+        onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
+      >
+        <IconVolume muted={muted} size={18} />
+      </button>
+    </>
+  );
+}
 
 // El video de una historia, con el mismo arreglo que le hicimos a los
 // reels: fijamos "muted" a mano sobre el elemento (no sólo como prop de
@@ -60,6 +92,8 @@ function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
           {story.media_type === 'video'
             ? <StoryVideo src={story.media_url} onEnded={onNext} />
             : <img src={story.media_url} alt="" />}
+          {story.media_type === 'image' && story.music_key && <StoryAudio musicKey={story.music_key} />}
+          <OverlayLayer overlays={story.overlays} />
         </div>
         <div className="story-tap-zone left" onClick={onPrev} />
         <div className="story-tap-zone right" onClick={onNext} />
@@ -78,13 +112,15 @@ export default function StoriesRow({ showToast }) {
   const [viewer, setViewer] = useState(null); // { groupIndex, storyIndex }
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
+  const [editFile, setEditFile] = useState(null);
+  const [editUrl, setEditUrl] = useState(null);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const timerRef = useRef(null);
 
-  function uploadStoryFile(file) {
+  function uploadStoryFile(file, extra) {
     setUploading(true);
-    api.createStory(file)
+    api.createStory(file, extra)
       .then(() => { showToast('¡Historia publicada!'); return load(); })
       .catch((err) => showToast(err.message))
       .finally(() => setUploading(false));
@@ -111,19 +147,37 @@ export default function StoriesRow({ showToast }) {
       showToast('Ese archivo no es una foto ni un video');
       return;
     }
-    // Las fotos se pueden acomodar antes de subir; los videos se suben tal
-    // cual (recortar un video ya no es un simple "encuadre" como con una
-    // imagen).
+    // Las fotos se pueden acomodar (recortar) antes de subir; los videos no
+    // (recortar un video ya no es un simple "encuadre" como con una
+    // imagen). Ambos pasan por el editor de texto/stickers/música antes de
+    // publicarse.
     if (file.type.startsWith('image/')) {
       setCropFile(file);
     } else {
-      uploadStoryFile(file);
+      openEditor(file);
     }
+  }
+
+  function openEditor(file) {
+    setEditFile(file);
+    setEditUrl(URL.createObjectURL(file));
+  }
+
+  function closeEditor() {
+    if (editUrl) URL.revokeObjectURL(editUrl);
+    setEditFile(null);
+    setEditUrl(null);
   }
 
   function handleCropConfirm(croppedFile) {
     setCropFile(null);
-    uploadStoryFile(croppedFile);
+    openEditor(croppedFile);
+  }
+
+  function handleEditorConfirm({ overlays, musicKey }) {
+    const file = editFile;
+    closeEditor();
+    uploadStoryFile(file, { overlays, musicKey });
   }
 
   function openViewer(groupIndex) {
@@ -252,6 +306,19 @@ export default function StoriesRow({ showToast }) {
           title="Acomodá tu historia"
           onConfirm={handleCropConfirm}
           onCancel={() => setCropFile(null)}
+        />
+      )}
+
+      {editFile && (
+        <MediaEditor
+          mediaUrl={editUrl}
+          mediaType={editFile.type.startsWith('video/') ? 'video' : 'image'}
+          aspect={9 / 16}
+          allowMusic={editFile.type.startsWith('image/')}
+          title="Agregá texto, stickers o música"
+          confirmLabel="Publicar historia"
+          onConfirm={handleEditorConfirm}
+          onCancel={closeEditor}
         />
       )}
     </div>

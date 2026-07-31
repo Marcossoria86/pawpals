@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from './api';
 import PetIllustration from './PetIllustration';
 import PetAvatar from './PetAvatar';
@@ -272,7 +273,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
         </div>
       ))}
 
-      {shareModalPostId !== null && (
+      {shareModalPostId !== null && createPortal(
         <div className="modal-backdrop" onClick={() => !sharing && setShareModalPostId(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">Compartir publicación</div>
@@ -292,7 +293,8 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {cropFile && (

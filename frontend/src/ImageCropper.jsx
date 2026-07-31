@@ -1,10 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { IconClose } from './Icons';
 
 // Modal para "acomodar" una foto antes de subirla: se ve el marco tal cual
 // va a quedar (cuadrado para el perfil o publicaciones, vertical para
-// historias), se puede arrastrar para reencuadrar y hay un control de zoom.
-// Al confirmar, se recorta de verdad con un canvas — lo que se sube es ya
-// la imagen recortada, no la original completa.
+// historias), se puede arrastrar para reencuadrar (en cualquier dirección) y
+// hay zoom por gesto de pellizco (pinch) con dos dedos — sin botón ni
+// control aparte, como en Instagram. Al confirmar, se recorta de verdad con
+// un canvas: lo que se sube es ya la imagen recortada, no la original
+// completa.
+//
+// Se monta con un Portal directo a <body> (igual que el visor de historias)
+// para que quede SIEMPRE por encima de todo — header, cuadro de "publicar",
+// barra de abajo — sin importar en qué parte del feed esté anidado. Sin
+// esto, en Safari/iOS un elemento position:fixed anidado dentro de un
+// contenedor con scroll puede terminar "atrapado" ahí adentro: se ve el
+// cuadro de publicar de fondo, aparece una barra de scroll fantasma y la
+// barra de navegación de abajo tapa los botones.
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 export default function ImageCropper({
   file,
   aspect = 1,
@@ -23,6 +39,8 @@ export default function ImageCropper({
   const containerRef = useRef(null);
   const imgElRef = useRef(null);
   const dragRef = useRef(null);
+  const pinchRef = useRef(null);
+  const pointersRef = useRef(new Map());
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -77,19 +95,68 @@ export default function ImageCropper({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, containerSize.width, containerSize.height, natural]);
 
+  // Un dedo (o el mouse) arrastra la foto para reencuadrarla, en cualquier
+  // dirección — horizontal y vertical — dentro del margen que deje el zoom
+  // actual. Dos dedos hacen zoom tipo "pellizco", sin ningún botón: al bajar
+  // el segundo dedo guardamos la distancia entre ambos y el zoom de partida,
+  // y mientras se mueven vamos escalando el zoom según cuánto cambió esa
+  // distancia.
   function handlePointerDown(e) {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startOffset: offset };
+    // Si falla la captura (puede pasar con algunos navegadores al bajar el
+    // segundo dedo casi al mismo tiempo que el primero) seguimos igual: no
+    // queremos perder el segundo puntero y que el pellizco quede roto.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 2) {
+      const pts = Array.from(pointersRef.current.values());
+      pinchRef.current = { startDist: dist(pts[0], pts[1]) || 1, startZoom: zoom };
+      dragRef.current = null;
+    } else if (pointersRef.current.size === 1) {
+      dragRef.current = { startX: e.clientX, startY: e.clientY, startOffset: offset };
+      pinchRef.current = null;
+    }
   }
+
   function handlePointerMove(e) {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    const next = { x: dragRef.current.startOffset.x + dx, y: dragRef.current.startOffset.y + dy };
-    setOffset(clamp(next, displayed.w, displayed.h));
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointersRef.current.size === 2 && pinchRef.current) {
+      const pts = Array.from(pointersRef.current.values());
+      const d = dist(pts[0], pts[1]);
+      const ratio = d / pinchRef.current.startDist;
+      const nextZoom = Math.max(1, Math.min(4, pinchRef.current.startZoom * ratio));
+      setZoom(nextZoom);
+      return;
+    }
+
+    if (pointersRef.current.size === 1 && dragRef.current) {
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      const next = { x: dragRef.current.startOffset.x + dx, y: dragRef.current.startOffset.y + dy };
+      setOffset(clamp(next, displayed.w, displayed.h));
+    }
   }
-  function handlePointerUp() {
-    dragRef.current = null;
+
+  function handlePointerUp(e) {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size === 1) {
+      // Quedó un solo dedo apoyado (se levantó uno de los dos del pellizco):
+      // reiniciamos la referencia de arrastre con la posición actual para
+      // que la foto no "salte" de golpe.
+      const [, pt] = Array.from(pointersRef.current.entries())[0];
+      dragRef.current = { startX: pt.x, startY: pt.y, startOffset: offset };
+      pinchRef.current = null;
+    } else if (pointersRef.current.size === 0) {
+      dragRef.current = null;
+      pinchRef.current = null;
+    }
+  }
+
+  // Zoom con rueda/trackpad para quien está en la versión web de escritorio
+  // (no tiene pantalla táctil para pellizcar).
+  function handleWheel(e) {
+    setZoom((z) => Math.max(1, Math.min(4, z - e.deltaY * 0.0015)));
   }
 
   function handleConfirm() {
@@ -117,10 +184,15 @@ export default function ImageCropper({
     }, 'image/jpeg', 0.9);
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal-card cropper-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">{title}</div>
+        <div className="modal-title-row">
+          <div className="modal-title">{title}</div>
+          <button type="button" className="modal-close-x" onClick={onCancel} disabled={saving} aria-label="Cerrar">
+            <IconClose size={20} />
+          </button>
+        </div>
         <div
           className={`cropper-frame ${shape === 'circle' ? 'circle' : ''}`}
           ref={containerRef}
@@ -129,6 +201,8 @@ export default function ImageCropper({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onWheel={handleWheel}
         >
           {imgUrl && (
             <img
@@ -146,17 +220,7 @@ export default function ImageCropper({
             />
           )}
         </div>
-        <div className="cropper-zoom-row">
-          <span className="cropper-zoom-label">Zoom</span>
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.02"
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-          />
-        </div>
+        <div className="cropper-hint">Arrastrá para mover · Pellizcá para hacer zoom</div>
         <div className="modal-actions">
           <button className="modal-btn-secondary" onClick={onCancel} disabled={saving}>Cancelar</button>
           <button className="modal-btn-primary" onClick={handleConfirm} disabled={!natural || saving}>
@@ -164,6 +228,7 @@ export default function ImageCropper({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

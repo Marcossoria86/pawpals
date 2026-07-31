@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import { IconClose } from './Icons';
 
 // Modal con la lista de seguidores o seguidos de una mascota. Se usa tanto
-// desde el perfil propio como desde el de otra mascota.
+// desde el perfil propio como desde el de otra mascota. Portal a <body> por
+// la misma razón que ImageCropper/StoryViewerOverlay: evita que quede
+// atrapado dentro del contenedor con scroll de <main> en Safari/iOS.
 export default function FollowListModal({ petId, kind, onClose, onViewPet, showToast }) {
   const [items, setItems] = useState(null);
 
@@ -15,7 +18,7 @@ export default function FollowListModal({ petId, kind, onClose, onViewPet, showT
       .catch(() => showToast('No se pudo cargar la lista'));
   }, [petId, kind]);
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card follow-list-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title-row">
@@ -45,6 +48,7 @@ export default function FollowListModal({ petId, kind, onClose, onViewPet, showT
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

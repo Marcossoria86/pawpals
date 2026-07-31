@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
+import MediaEditor from './MediaEditor';
+import OverlayLayer from './OverlayLayer';
 import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload } from './Icons';
 
 function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) {
@@ -65,6 +68,7 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
           <IconPlayPause playing={false} size={56} />
         </div>
       )}
+      <OverlayLayer overlays={reel.overlays} />
       <div className="reel-overlay">
         <button className="reel-pet-link" onClick={() => onViewPet?.(reel.pet_id)}>
           <PetAvatar photoUrl={reel.pet_photo_url} species={reel.species} color={reel.color} size={36} />
@@ -106,6 +110,9 @@ export default function ReelsView({ showToast, onViewPet }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [caption, setCaption] = useState('');
   const [videoFile, setVideoFile] = useState(null);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [overlays, setOverlays] = useState([]);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -131,18 +138,41 @@ export default function ReelsView({ showToast, onViewPet }) {
       return;
     }
     setVideoFile(file);
+    setOverlays([]);
+    setVideoUrl(URL.createObjectURL(file));
+    // Apenas elige el video le abrimos el editor de texto/stickers — igual
+    // que en historias, puede publicar sin agregar nada si no quiere.
+    setEditorOpen(true);
+  }
+
+  function handleEditorConfirm({ overlays: newOverlays }) {
+    setOverlays(newOverlays);
+    setEditorOpen(false);
+  }
+
+  function resetComposer() {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoFile(null);
+    setVideoUrl(null);
+    setOverlays([]);
+    setEditorOpen(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function closeComposer() {
+    resetComposer();
+    setComposerOpen(false);
   }
 
   async function handleUpload() {
     if (!videoFile) return;
     setPosting(true);
     try {
-      await api.createReel({ caption, videoFile });
+      await api.createReel({ caption, videoFile, overlays });
       showToast('¡Reel publicado!');
       setCaption('');
-      setVideoFile(null);
+      resetComposer();
       setComposerOpen(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
       await load();
     } catch (err) {
       showToast(err.message);
@@ -191,8 +221,8 @@ export default function ReelsView({ showToast, onViewPet }) {
         ))}
       </div>
 
-      {composerOpen && (
-        <div className="modal-backdrop" onClick={() => !posting && setComposerOpen(false)}>
+      {composerOpen && createPortal(
+        <div className="modal-backdrop" onClick={() => !posting && closeComposer()}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">Subir un reel</div>
             <input
@@ -202,6 +232,11 @@ export default function ReelsView({ showToast, onViewPet }) {
               onChange={handlePickVideo}
               className="modal-file-input"
             />
+            {videoFile && (
+              <button type="button" className="editor-reopen-btn" onClick={() => setEditorOpen(true)}>
+                Editar texto y stickers {overlays.length > 0 ? `(${overlays.length})` : ''}
+              </button>
+            )}
             <input
               type="text"
               className="modal-text-input"
@@ -211,13 +246,27 @@ export default function ReelsView({ showToast, onViewPet }) {
               onChange={(e) => setCaption(e.target.value)}
             />
             <div className="modal-actions">
-              <button className="modal-btn-secondary" onClick={() => setComposerOpen(false)} disabled={posting}>Cancelar</button>
+              <button className="modal-btn-secondary" onClick={closeComposer} disabled={posting}>Cancelar</button>
               <button className="modal-btn-primary" onClick={handleUpload} disabled={!videoFile || posting}>
                 {posting ? 'Subiendo…' : 'Publicar'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {editorOpen && videoUrl && (
+        <MediaEditor
+          mediaUrl={videoUrl}
+          mediaType="video"
+          aspect={9 / 16}
+          allowMusic={false}
+          title="Agregá texto o stickers al reel"
+          confirmLabel="Listo"
+          onConfirm={handleEditorConfirm}
+          onCancel={() => setEditorOpen(false)}
+        />
       )}
     </div>
   );

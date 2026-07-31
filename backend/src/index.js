@@ -75,6 +75,34 @@ const uploadStory = multer({
 
 // Reels: video real, 75 MB (sin transcodificar — el navegador reproduce el
 // archivo tal cual se subió, por eso conviene pedir clips ya livianos).
+// Catálogo de música para historias — tiene que ser exactamente uno de
+// estos keys (espejados en frontend/src/musicCatalog.js); cualquier otra
+// cosa que venga en el pedido se ignora.
+const MUSIC_KEYS = ['alegre', 'relax', 'fiesta', 'tierno', 'energico'];
+
+// Valida y devuelve una lista de overlays (texto/stickers) lista para
+// guardar como JSON: nunca confiamos en lo que manda el cliente sin
+// revisarlo (podría no ser un array, tener campos gigantes, etc).
+function sanitizeOverlays(raw) {
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, 25).map((o, i) => ({
+    id: Number.isFinite(o.id) ? o.id : i + 1,
+    type: o.type === 'sticker' ? 'sticker' : 'text',
+    content: String(o.content || '').slice(0, 60),
+    xPct: Math.max(0, Math.min(100, Number(o.xPct) || 50)),
+    yPct: Math.max(0, Math.min(100, Number(o.yPct) || 50)),
+    scale: Math.max(0.4, Math.min(3, Number(o.scale) || 1)),
+    color: typeof o.color === 'string' ? o.color.slice(0, 20) : undefined
+  })).filter((o) => o.content);
+}
+
 const REEL_MAX_MB = 75;
 const uploadReel = multer({
   storage: makeStorage(),
@@ -625,17 +653,27 @@ app.post('/api/stories', requireAuth, (req, res, next) => {
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
   const mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+  // La música es sólo para historias de foto — un video de historia ya trae
+  // su propio audio.
+  const musicKey = mediaType === 'image' && MUSIC_KEYS.includes(req.body.music_key) ? req.body.music_key : null;
+  const overlays = sanitizeOverlays(req.body.overlays);
   const info = db
-    .prepare('INSERT INTO stories (pet_id, media_path, media_type) VALUES (?, ?, ?)')
-    .run(pet.id, req.file.filename, mediaType);
+    .prepare('INSERT INTO stories (pet_id, media_path, media_type, music_key, overlays) VALUES (?, ?, ?, ?, ?)')
+    .run(pet.id, req.file.filename, mediaType, musicKey, overlays.length ? JSON.stringify(overlays) : null);
 
-  res.json({ id: info.lastInsertRowid, media_url: absoluteUploadUrl(req, req.file.filename), media_type: mediaType });
+  res.json({
+    id: info.lastInsertRowid,
+    media_url: absoluteUploadUrl(req, req.file.filename),
+    media_type: mediaType,
+    music_key: musicKey,
+    overlays
+  });
 });
 
 app.get('/api/stories', requireAuth, (req, res) => {
   const rows = db
     .prepare(
-      `SELECT stories.id, stories.media_path, stories.media_type, stories.created_at,
+      `SELECT stories.id, stories.media_path, stories.media_type, stories.music_key, stories.overlays, stories.created_at,
               pets.id AS pet_id, pets.name AS pet_name, pets.species, pets.color, pets.photo_path, pets.owner_id
        FROM stories
        JOIN pets ON pets.id = stories.pet_id
@@ -657,10 +695,17 @@ app.get('/api/stories', requireAuth, (req, res) => {
         stories: []
       });
     }
+    let overlays = [];
+    try { overlays = r.overlays ? JSON.parse(r.overlays) : []; } catch { overlays = []; }
     byPet.get(r.pet_id).stories.push({
       id: r.id,
       media_url: absoluteUploadUrl(req, r.media_path),
       media_type: r.media_type,
+      // El archivo de música vive como asset estático del FRONTEND
+      // (public/music/*.mp3, ver frontend/src/musicCatalog.js) — el backend
+      // sólo guarda y devuelve el "key" (ej. "alegre"), no una URL.
+      music_key: r.music_key || null,
+      overlays,
       created_at: r.created_at
     });
   });
@@ -683,17 +728,18 @@ app.post('/api/reels', requireAuth, (req, res, next) => {
   const pet = getPetByOwner(req.userId);
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
+  const overlays = sanitizeOverlays(req.body.overlays);
   const info = db
-    .prepare("INSERT INTO posts (pet_id, caption, video_path, post_type) VALUES (?, ?, ?, 'reel')")
-    .run(pet.id, (caption || '').trim().slice(0, 280), req.file.filename);
+    .prepare("INSERT INTO posts (pet_id, caption, video_path, post_type, overlays) VALUES (?, ?, ?, 'reel', ?)")
+    .run(pet.id, (caption || '').trim().slice(0, 280), req.file.filename, overlays.length ? JSON.stringify(overlays) : null);
 
-  res.json({ id: info.lastInsertRowid, video_url: absoluteUploadUrl(req, req.file.filename) });
+  res.json({ id: info.lastInsertRowid, video_url: absoluteUploadUrl(req, req.file.filename), overlays });
 });
 
 app.get('/api/reels', requireAuth, (req, res) => {
   const rows = db
     .prepare(
-      `SELECT posts.id, posts.caption, posts.video_path, posts.created_at,
+      `SELECT posts.id, posts.caption, posts.video_path, posts.overlays, posts.created_at,
               pets.id AS pet_id, pets.owner_id, pets.name AS pet_name, pets.species, pets.breed, pets.color, pets.photo_path,
               (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS likes_count,
               (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
@@ -706,13 +752,18 @@ app.get('/api/reels', requireAuth, (req, res) => {
     .all(req.userId);
 
   res.json(
-    rows.map((r) => ({
-      ...r,
-      liked_by_me: !!r.liked_by_me,
-      is_mine: r.owner_id === req.userId,
-      video_url: absoluteUploadUrl(req, r.video_path),
-      pet_photo_url: absoluteUploadUrl(req, r.photo_path)
-    }))
+    rows.map((r) => {
+      let overlays = [];
+      try { overlays = r.overlays ? JSON.parse(r.overlays) : []; } catch { overlays = []; }
+      return {
+        ...r,
+        liked_by_me: !!r.liked_by_me,
+        is_mine: r.owner_id === req.userId,
+        video_url: absoluteUploadUrl(req, r.video_path),
+        pet_photo_url: absoluteUploadUrl(req, r.photo_path),
+        overlays
+      };
+    })
   );
 });
 

@@ -114,6 +114,20 @@ CREATE TABLE IF NOT EXISTS follows (
 );
 `);
 
+// Migraciones simples: agregan columnas nuevas a tablas que ya existían en
+// bases de datos desplegadas antes de esta versión (CREATE TABLE IF NOT
+// EXISTS no alcanza para eso — sólo crea la tabla si no existía, no le
+// agrega columnas a una que ya estaba ahí).
+function ensureColumn(table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+ensureColumn('stories', 'music_key', 'TEXT');
+ensureColumn('stories', 'overlays', 'TEXT');
+ensureColumn('posts', 'overlays', 'TEXT');
+
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
   if (userCount > 0) return;
