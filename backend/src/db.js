@@ -129,6 +129,7 @@ ensureColumn('stories', 'overlays', 'TEXT');
 ensureColumn('stories', 'music_path', 'TEXT');
 ensureColumn('stories', 'mute_original', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('posts', 'overlays', 'TEXT');
+ensureColumn('users', 'accepted_terms_at', 'TEXT');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

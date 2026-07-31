@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { api } from './api';
 import PetIllustration, { SPECIES_LIST } from './PetIllustration';
+import LegalModal from './LegalModal';
 
 export default function AuthView({ onAuthenticated }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [legalOpen, setLegalOpen] = useState(null); // null | 'terms' | 'privacy'
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -29,10 +32,18 @@ export default function AuthView({ onAuthenticated }) {
 
   async function handleRegister(e) {
     e.preventDefault();
+    if (!acceptTerms) {
+      setError('Tenés que aceptar los Términos y Condiciones y la Política de Privacidad');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      await api.register({ ...registerForm, petAge: registerForm.petAge ? Number(registerForm.petAge) : null });
+      await api.register({
+        ...registerForm,
+        petAge: registerForm.petAge ? Number(registerForm.petAge) : null,
+        acceptTerms: true
+      });
       onAuthenticated();
     } catch (err) {
       setError(err.message);
@@ -123,7 +134,24 @@ export default function AuthView({ onAuthenticated }) {
               <input value={registerForm.petBio}
                 onChange={(e) => setRegisterForm({ ...registerForm, petBio: e.target.value })} />
             </div>
-            <button className="primary-btn" disabled={loading}>
+            <label className="terms-row">
+              <input
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+              />
+              <span>
+                Acepto los{' '}
+                <button type="button" className="terms-link" onClick={() => setLegalOpen('terms')}>
+                  Términos y Condiciones
+                </button>{' '}
+                y la{' '}
+                <button type="button" className="terms-link" onClick={() => setLegalOpen('privacy')}>
+                  Política de Privacidad
+                </button>
+              </span>
+            </label>
+            <button className="primary-btn" disabled={loading || !acceptTerms}>
               {loading ? 'Creando…' : 'Crear cuenta'}
             </button>
           </form>
@@ -137,6 +165,7 @@ export default function AuthView({ onAuthenticated }) {
           )}
         </div>
       </div>
+      {legalOpen && <LegalModal kind={legalOpen} onClose={() => setLegalOpen(null)} />}
     </div>
   );
 }

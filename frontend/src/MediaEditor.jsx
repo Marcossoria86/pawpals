@@ -38,6 +38,7 @@ export default function MediaEditor({
   const [musicPreviewUrl, setMusicPreviewUrl] = useState(null);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [muteOriginal, setMuteOriginal] = useState(false);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
 
   const frameRef = useRef(null);
   const dragRef = useRef(null);
@@ -114,6 +115,7 @@ export default function MediaEditor({
     setMusicFile(file);
     setMusicPreviewUrl(URL.createObjectURL(file));
     setPreviewPlaying(false);
+    setRightsConfirmed(false);
   }
 
   function removeMusic() {
@@ -122,6 +124,7 @@ export default function MediaEditor({
     setMusicFile(null);
     setMusicPreviewUrl(null);
     setPreviewPlaying(false);
+    setRightsConfirmed(false);
   }
 
   function togglePreview() {
@@ -138,6 +141,7 @@ export default function MediaEditor({
   }
 
   function handleConfirm() {
+    if (musicFile && !rightsConfirmed) return;
     previewAudioRef.current?.pause();
     onConfirm({ overlays, musicFile, muteOriginal });
   }
@@ -291,13 +295,29 @@ export default function MediaEditor({
             <p className="editor-music-disclaimer">
               Es tu responsabilidad tener los derechos para usar este audio (por ejemplo, una grabación propia).
             </p>
+            {musicFile && (
+              <label className="editor-mute-row editor-rights-row">
+                <input
+                  type="checkbox"
+                  checked={rightsConfirmed}
+                  onChange={(e) => setRightsConfirmed(e.target.checked)}
+                />
+                <span>Confirmo que tengo los derechos para usar este audio</span>
+              </label>
+            )}
           </div>
         )}
 
         <div className="cropper-hint">Arrastrá el texto o el sticker para moverlo</div>
         <div className="modal-actions">
           <button className="modal-btn-secondary" onClick={onCancel}>Cancelar</button>
-          <button className="modal-btn-primary" onClick={handleConfirm}>{confirmLabel}</button>
+          <button
+            className="modal-btn-primary"
+            onClick={handleConfirm}
+            disabled={!!musicFile && !rightsConfirmed}
+          >
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>,

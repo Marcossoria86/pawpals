@@ -226,6 +226,28 @@ main{
   border-radius:10px;
   margin-bottom:12px;
 }
+.terms-row{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  font-size:12px;
+  line-height:1.5;
+  color:var(--ink-soft);
+  margin:2px 0 4px;
+  cursor:pointer;
+}
+.terms-row input{ flex-shrink:0; margin-top:2px; }
+.terms-link{
+  background:none;
+  border:none;
+  padding:0;
+  margin:0;
+  font-size:12px;
+  font-weight:700;
+  color:var(--brand);
+  cursor:pointer;
+  text-decoration:underline;
+}
 
 /* Compose box */
 .compose{
@@ -1224,6 +1246,29 @@ main.no-pad{ padding:0; }
   cursor:pointer;
 }
 .modal-btn-primary:disabled, .modal-btn-secondary:disabled{ opacity:0.5; cursor:not-allowed; }
+
+/* ---------- Modal de Términos / Política de Privacidad ---------- */
+.legal-modal-card{ max-width:420px; display:flex; flex-direction:column; max-height:80vh; }
+.legal-modal-body{
+  overflow-y:auto;
+  flex:1;
+  margin-bottom:14px;
+  padding-right:2px;
+}
+.legal-section{ margin-bottom:16px; }
+.legal-section-title{
+  font-size:13.5px;
+  font-weight:800;
+  color:var(--ink);
+  margin-bottom:4px;
+}
+.legal-section-body{
+  font-size:12.5px;
+  color:var(--ink-soft);
+  line-height:1.55;
+  margin:0 0 8px;
+  white-space:pre-line;
+}
 
 /* ---------- Publicación compartida (anidada) ---------- */
 .shared-embed{

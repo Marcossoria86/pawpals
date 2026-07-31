@@ -183,16 +183,21 @@ function isFollowing(followerPetId, followedPetId) {
 // ---------- AUTH ----------
 
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, password, petName, petSpecies, petBreed, petAge, petBio, lat, lng } = req.body;
+  const { name, email, password, petName, petSpecies, petBreed, petAge, petBio, lat, lng, acceptTerms } = req.body;
   if (!name || !email || !password || !petName || !petSpecies || !petBreed) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  }
+  // El registro exige haber aceptado los Términos y la Política de
+  // Privacidad — sin esto no se puede crear la cuenta (ver AuthView.jsx).
+  if (acceptTerms !== true) {
+    return res.status(400).json({ error: 'Tenés que aceptar los Términos y Condiciones y la Política de Privacidad' });
   }
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) return res.status(409).json({ error: 'Ese correo ya está registrado' });
 
   const passwordHash = bcrypt.hashSync(password, 10);
   const userInfo = db
-    .prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)')
+    .prepare('INSERT INTO users (name, email, password_hash, accepted_terms_at) VALUES (?, ?, ?, datetime(\'now\'))')
     .run(name, email, passwordHash);
 
   const colorPalette = ['#f2e3da', '#e1ede8'];
