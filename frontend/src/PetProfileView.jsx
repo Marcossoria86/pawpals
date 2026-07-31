@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import FollowListModal from './FollowListModal';
-import { IconComment, IconAddUser, IconCheck } from './Icons';
+import ReportModal from './ReportModal';
+import { IconComment, IconAddUser, IconCheck, IconFlag, IconBlock } from './Icons';
 
 export default function PetProfileView({ petId, onBack, showToast, onMessagePet, onViewPet }) {
   const [data, setData] = useState(null);
   const [requesting, setRequesting] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
   const [listModal, setListModal] = useState(null); // 'followers' | 'following' | null
+  const [reportOpen, setReportOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setData(null);
@@ -45,13 +49,48 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
     }
   }
 
+  async function handleToggleBlock() {
+    const wasBlocked = data.is_blocked;
+    if (!wasBlocked && !window.confirm(`¿Bloquear a ${data.pet.name}? No van a poder verse ni escribirse hasta que lo desbloquees.`)) {
+      return;
+    }
+    setMenuOpen(false);
+    setBlockBusy(true);
+    try {
+      const result = await api.toggleBlock(petId);
+      setData((prev) => ({ ...prev, is_blocked: result.blocked, is_following: result.blocked ? false : prev.is_following }));
+      showToast(result.blocked ? `Bloqueaste a ${data.pet.name}` : `Desbloqueaste a ${data.pet.name}`);
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setBlockBusy(false);
+    }
+  }
+
   if (!data) return <div className="section-title">Cargando perfil…</div>;
 
-  const { pet, owner_name, distance_km, playdate_status, is_me, is_following, stats } = data;
+  const { pet, owner_name, distance_km, playdate_status, is_me, is_following, is_blocked, stats } = data;
 
   return (
     <section>
-      <button className="back-link" onClick={onBack}>← Volver</button>
+      <div className="pet-profile-top-row">
+        <button className="back-link" onClick={onBack}>← Volver</button>
+        {!is_me && (
+          <div className="post-menu" style={{ position: 'relative' }}>
+            <button type="button" className="post-menu-btn" onClick={() => setMenuOpen((v) => !v)} aria-label="Más opciones">⋮</button>
+            {menuOpen && (
+              <div className="post-menu-dropdown">
+                <button type="button" onClick={() => { setMenuOpen(false); setReportOpen(true); }}>
+                  <IconFlag size={15} /> Reportar perfil
+                </button>
+                <button type="button" className="danger" onClick={handleToggleBlock} disabled={blockBusy}>
+                  <IconBlock size={15} /> {is_blocked ? 'Desbloquear' : 'Bloquear'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="profile-hero">
         <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} size={84} className="profile-avatar" />
         <div className="profile-name">{pet.name}</div>
@@ -68,7 +107,10 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
             <b>{stats.following}</b><span>siguiendo</span>
           </button>
         </div>
-        {!is_me && (
+        {!is_me && is_blocked && (
+          <div className="settings-help-text">Bloqueaste a {pet.name}. Desbloqueala desde el menú (⋮) para volver a interactuar.</div>
+        )}
+        {!is_me && !is_blocked && (
           <div className="profile-action-row">
             <button
               type="button"
@@ -83,7 +125,7 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
             </button>
           </div>
         )}
-        {!is_me && (
+        {!is_me && !is_blocked && (
           <button
             className={`match-btn profile-match-btn ${playdate_status ? 'sent' : ''}`}
             disabled={!!playdate_status || requesting}
@@ -102,6 +144,15 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
           kind={listModal}
           onClose={() => setListModal(null)}
           onViewPet={(id) => { setListModal(null); onViewPet?.(id); }}
+          showToast={showToast}
+        />
+      )}
+
+      {reportOpen && (
+        <ReportModal
+          targetType="pet"
+          targetId={petId}
+          onClose={() => setReportOpen(false)}
           showToast={showToast}
         />
       )}

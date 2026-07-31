@@ -6,13 +6,15 @@ import CommentSection from './CommentSection';
 import MediaEditor from './MediaEditor';
 import OverlayLayer from './OverlayLayer';
 import ErrorBoundary from './ErrorBoundary';
-import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload } from './Icons';
+import ReportModal from './ReportModal';
+import { IconHeart, IconComment, IconVolume, IconPlayPause, IconUpload, IconFlag } from './Icons';
 
 function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) {
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Ponemos "muted" a mano sobre el elemento de video (no sólo como prop de
   // React) porque algunos navegadores sólo respetan la propiedad real del
@@ -89,6 +91,11 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
         <button className="reel-action" onClick={() => setMuted((m) => !m)}>
           <IconVolume muted={muted} size={24} />
         </button>
+        {!reel.is_mine && (
+          <button className="reel-action" onClick={() => setReportOpen(true)} title="Reportar">
+            <IconFlag size={22} />
+          </button>
+        )}
       </div>
       {showComments && (
         <div className="reel-comments">
@@ -96,10 +103,19 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
             postId={reel.id}
             commentsCount={reel.comments_count || 0}
             disabled={false}
+            isPostOwner={reel.is_mine}
             showToast={showToast}
             onCountChange={onCommentCountChange}
           />
         </div>
+      )}
+      {reportOpen && (
+        <ReportModal
+          targetType="post"
+          targetId={reel.id}
+          onClose={() => setReportOpen(false)}
+          showToast={showToast}
+        />
       )}
     </div>
   );

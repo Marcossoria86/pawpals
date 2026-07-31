@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from './api';
 import LegalModal from './LegalModal';
+import PetAvatar from './PetAvatar';
 import { IconClose, IconLocation } from './Icons';
 import { SUPPORT_EMAIL } from './config';
 
@@ -31,6 +32,60 @@ export default function SettingsModal({ me, onClose, onLogout, showToast }) {
   const [deleteStep, setDeleteStep] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  const [currentPwForPw, setCurrentPwForPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [savingPw, setSavingPw] = useState(false);
+
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPwForEmail, setCurrentPwForEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  const [blockedPets, setBlockedPets] = useState(null);
+
+  useEffect(() => {
+    api.blockedPets().then(setBlockedPets).catch(() => setBlockedPets([]));
+  }, []);
+
+  async function handleChangePassword() {
+    if (!currentPwForPw || newPw.length < 6) return;
+    setSavingPw(true);
+    try {
+      await api.changePassword(currentPwForPw, newPw);
+      setCurrentPwForPw('');
+      setNewPw('');
+      showToast('¡Contraseña actualizada!');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setSavingPw(false);
+    }
+  }
+
+  async function handleChangeEmail() {
+    if (!newEmail.trim() || !currentPwForEmail) return;
+    setSavingEmail(true);
+    try {
+      await api.changeEmail(newEmail.trim(), currentPwForEmail);
+      setCurrentPwForEmail('');
+      setNewEmail('');
+      showToast('¡Correo actualizado!');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setSavingEmail(false);
+    }
+  }
+
+  async function handleUnblock(petId) {
+    try {
+      await api.toggleBlock(petId);
+      setBlockedPets((prev) => prev.filter((p) => p.id !== petId));
+      showToast('Desbloqueado');
+    } catch (err) {
+      showToast(err.message);
+    }
+  }
 
   async function handleToggleShareLocation(e) {
     const next = e.target.checked;
@@ -90,6 +145,70 @@ export default function SettingsModal({ me, onClose, onLogout, showToast }) {
               </label>
               <button type="button" className="settings-secondary-btn" onClick={handleUpdateLocation} disabled={updatingLocation}>
                 <IconLocation size={15} /> {updatingLocation ? 'Actualizando…' : 'Actualizar mi ubicación ahora'}
+              </button>
+
+              {blockedPets && blockedPets.length > 0 && (
+                <>
+                  <div className="settings-section-title">Cuentas bloqueadas</div>
+                  {blockedPets.map((p) => (
+                    <div className="settings-blocked-row" key={p.id}>
+                      <PetAvatar photoUrl={p.photo_url} species={p.species} color={p.color} size={30} />
+                      <span className="settings-blocked-name">{p.name}</span>
+                      <button type="button" className="settings-unblock-btn" onClick={() => handleUnblock(p.id)}>
+                        Desbloquear
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div className="settings-section-title">Seguridad</div>
+              <div className="settings-form-row">
+                <label>Cambiar contraseña</label>
+                <input
+                  type="password"
+                  placeholder="Contraseña actual"
+                  value={currentPwForPw}
+                  onChange={(e) => setCurrentPwForPw(e.target.value)}
+                />
+                <input
+                  type="password"
+                  placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="settings-primary-btn"
+                onClick={handleChangePassword}
+                disabled={!currentPwForPw || newPw.length < 6 || savingPw}
+              >
+                {savingPw ? 'Guardando…' : 'Actualizar contraseña'}
+              </button>
+
+              <div className="settings-form-row">
+                <label>Cambiar correo (actual: {me?.user?.email})</label>
+                <input
+                  type="email"
+                  placeholder="Nuevo correo"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                />
+                <input
+                  type="password"
+                  placeholder="Tu contraseña actual"
+                  value={currentPwForEmail}
+                  onChange={(e) => setCurrentPwForEmail(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="settings-primary-btn"
+                onClick={handleChangeEmail}
+                disabled={!newEmail.trim() || !currentPwForEmail || savingEmail}
+              >
+                {savingEmail ? 'Guardando…' : 'Actualizar correo'}
               </button>
 
               <div className="settings-section-title">Legal</div>

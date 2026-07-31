@@ -188,6 +188,24 @@ export function IconSettings({ size = 20 }) {
   );
 }
 
+export function IconFlag({ size = 18 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M6 20V4" />
+      <path d="M6 5c1.6-1 3.4-1 5 0s3.4 1 5 0v8c-1.6 1-3.4 1-5 0s-3.4-1-5 0Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconBlock({ size = 18 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M6.3 6.3 17.7 17.7" />
+    </svg>
+  );
+}
+
 export function IconLocation({ size = 18 }) {
   return (
     <svg {...COMMON} width={size} height={size} aria-hidden="true">

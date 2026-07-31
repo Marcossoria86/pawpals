@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { api } from './api';
 import AuthView from './AuthView';
+import ResetPasswordView from './ResetPasswordView';
 import FeedView from './FeedView';
 import NearbyView from './NearbyView';
 import ProfileView from './ProfileView';
@@ -28,6 +29,10 @@ const TABS = [
 ];
 
 function App() {
+  // El enlace del mail de "recuperar contraseña" apunta acá con
+  // ?resetToken=... — si está presente, mostramos esa pantalla en vez del
+  // login/app normal, sin importar si ya había una sesión iniciada.
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('resetToken'));
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [tab, setTab] = useState('feed');
@@ -159,6 +164,20 @@ function App() {
     const interval = setInterval(() => { refreshUnread(); refreshUnreadMessages(); }, 20000);
     return () => clearInterval(interval);
   }, [authenticated, refreshUnread, refreshUnreadMessages]);
+
+  if (resetToken) {
+    return (
+      <ResetPasswordView
+        token={resetToken}
+        onDone={() => {
+          // Limpiamos el ?resetToken de la URL para no volver a esta
+          // pantalla si la persona recarga después de cambiar la contraseña.
+          window.history.replaceState({}, '', window.location.pathname);
+          setResetToken(null);
+        }}
+      />
+    );
+  }
 
   if (!authChecked) {
     return <div className="loading-screen">Cargando PawPals…</div>;

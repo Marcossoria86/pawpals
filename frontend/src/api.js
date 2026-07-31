@@ -60,7 +60,11 @@ export const api = {
       clearToken();
     }
   },
+  requestPasswordReset: (email) => request('/api/auth/request-reset', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token, newPassword) => request('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
   me: () => request('/api/me'),
+  changePassword: (currentPassword, newPassword) => request('/api/me/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) }),
+  changeEmail: (newEmail, currentPassword) => request('/api/me/email', { method: 'PATCH', body: JSON.stringify({ newEmail, currentPassword }) }),
   updateMyLocation: ({ lat, lng }) => request('/api/pets/me/location', { method: 'PATCH', body: JSON.stringify({ lat, lng }) }),
   updateLocationPrivacy: (shareLocation) => request('/api/pets/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareLocation }) }),
   deleteAccount: (password) => request('/api/me', { method: 'DELETE', body: JSON.stringify({ password }) }),
@@ -76,6 +80,8 @@ export const api = {
   toggleComments: (postId) => request(`/api/posts/${postId}/toggle-comments`, { method: 'POST' }),
   comments: (postId) => request(`/api/posts/${postId}/comments`),
   addComment: (postId, body) => request(`/api/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  editComment: (commentId, body) => request(`/api/comments/${commentId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteComment: (commentId) => request(`/api/comments/${commentId}`, { method: 'DELETE' }),
   nearby: () => request('/api/nearby'),
   requestPlaydate: (targetPetId) => request('/api/playdates', { method: 'POST', body: JSON.stringify({ targetPetId }) }),
   pet: (petId) => request(`/api/pets/${petId}`),
@@ -90,6 +96,11 @@ export const api = {
   toggleFollow: (petId) => request(`/api/pets/${petId}/follow`, { method: 'POST' }),
   petFollowers: (petId) => request(`/api/pets/${petId}/followers`),
   petFollowing: (petId) => request(`/api/pets/${petId}/following`),
+
+  toggleBlock: (petId) => request(`/api/pets/${petId}/block`, { method: 'POST' }),
+  blockedPets: () => request('/api/pets/blocked/mine'),
+  submitReport: ({ targetType, targetId, reason, details }) =>
+    request('/api/reports', { method: 'POST', body: JSON.stringify({ targetType, targetId, reason, details }) }),
 
   stories: () => request('/api/stories'),
   createStory: (mediaFile, { overlays, musicFile, muteOriginal } = {}) => {

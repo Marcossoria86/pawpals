@@ -112,6 +112,32 @@ CREATE TABLE IF NOT EXISTS follows (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(follower_pet_id, followed_pet_id)
 );
+
+-- Reportes de contenido o de cuentas (publicaciones, comentarios, perfiles
+-- de mascota). No borra ni oculta nada automáticamente: sólo queda
+-- registrado para que alguien del equipo lo revise (ver Configuración →
+-- Ayuda, que es también el mail al que puede escribir la persona).
+CREATE TABLE IF NOT EXISTS reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reporter_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_type TEXT NOT NULL,
+  target_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  details TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Bloqueos entre mascotas: si A bloquea a B, se esconden mutuamente del
+-- feed, reels, cerca de ti y comentarios, y no se pueden mandar mensajes
+-- entre sí (ver arePetsBlocked/blockedPetIdsFor en index.js).
+CREATE TABLE IF NOT EXISTS blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  blocker_pet_id INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  blocked_pet_id INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(blocker_pet_id, blocked_pet_id)
+);
 `);
 
 // Migraciones simples: agregan columnas nuevas a tablas que ya existían en
@@ -134,6 +160,12 @@ ensureColumn('users', 'accepted_terms_at', 'TEXT');
 // personas (ver Configuración en el perfil) — no borra la ubicación guardada,
 // solo la oculta de los resultados de otros.
 ensureColumn('pets', 'share_location', 'INTEGER NOT NULL DEFAULT 1');
+// Recuperar contraseña por mail (ver /api/auth/request-reset y
+// /api/auth/reset-password): token de un solo uso con vencimiento.
+ensureColumn('users', 'reset_token', 'TEXT');
+ensureColumn('users', 'reset_token_expires', 'TEXT');
+// Se marca cuando se edita un comentario, para mostrar "(editado)" en el frontend.
+ensureColumn('comments', 'edited_at', 'TEXT');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

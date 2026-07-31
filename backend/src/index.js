@@ -1,12 +1,15 @@
 require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { signToken, requireAuth } = require('./auth');
+const { sendPasswordResetEmail } = require('./email');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -21,6 +24,13 @@ const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
   .map((o) => o.trim())
   .filter(Boolean)
   .concat(CAPACITOR_ORIGINS);
+
+// URL pública de la web (pawpals-web en Render) usada para armar el enlace
+// que se manda por mail al recuperar la contraseña. Si no se define
+// APP_URL como variable de entorno, usamos el primer CLIENT_ORIGIN real
+// (el que no es de Capacitor) — en producción hay que configurar APP_URL
+// explícitamente en Render apuntando a la URL pública de pawpals-web.
+const APP_URL = process.env.APP_URL || (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',')[0].trim();
 
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -120,6 +130,30 @@ const uploadReel = multer({
   }
 });
 
+// ---------- ANTI-SPAM / RATE LIMITING ----------
+// Límites simples por IP (no hace falta ningún servicio externo). Sin esto,
+// cualquiera podría probar miles de contraseñas por minuto, crear cuentas en
+// masa, o inundar comentarios/mensajes con un script. `standardHeaders` manda
+// los headers RateLimit-* (más nuevos); apagamos los `X-RateLimit-*` legado.
+function makeLimiter(windowMs, max, message) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: message },
+    // Detrás de Render hay un proxy: sin esto express-rate-limit tira un
+    // error de "trust proxy" y no puede distinguir IPs distintas.
+    keyGenerator: (req) => req.ip
+  });
+}
+// Login/registro/recuperar contraseña: lo más sensible a fuerza bruta.
+const authLimiter = makeLimiter(15 * 60 * 1000, 20, 'Demasiados intentos. Esperá unos minutos y volvé a intentar.');
+// Crear contenido (publicaciones, comentarios, mensajes, reportes): generoso
+// para uso normal, pero corta un script que publique sin parar.
+const writeLimiter = makeLimiter(60 * 1000, 30, 'Estás yendo muy rápido — esperá un momento y volvé a intentar.');
+
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cors({
   origin: (origin, cb) => {
@@ -180,6 +214,37 @@ function isFollowing(followerPetId, followedPetId) {
     .get(followerPetId, followedPetId);
 }
 
+// ---------- BLOQUEOS ----------
+// El bloqueo es mutuo a propósito: si A bloquea a B, ninguna de las dos
+// mascotas ve contenido de la otra ni le puede escribir — igual de simple
+// para quien bloqueó (no tiene que además bloquear "en el otro sentido") y
+// más difícil de esquivar para quien fue bloqueado.
+function arePetsBlocked(petIdA, petIdB) {
+  if (!petIdA || !petIdB) return false;
+  return !!db
+    .prepare(
+      `SELECT 1 FROM blocks
+       WHERE (blocker_pet_id = ? AND blocked_pet_id = ?)
+          OR (blocker_pet_id = ? AND blocked_pet_id = ?)`
+    )
+    .get(petIdA, petIdB, petIdB, petIdA);
+}
+
+// Devuelve el conjunto de pet_id que "myPetId" no debería ver en ningún
+// lado (feed, reels, cerca de ti, comentarios): a quienes bloqueó, y a
+// quienes lo bloquearon a él.
+function blockedPetIdsFor(myPetId) {
+  if (!myPetId) return new Set();
+  const rows = db
+    .prepare(
+      `SELECT blocked_pet_id AS id FROM blocks WHERE blocker_pet_id = ?
+       UNION
+       SELECT blocker_pet_id AS id FROM blocks WHERE blocked_pet_id = ?`
+    )
+    .all(myPetId, myPetId);
+  return new Set(rows.map((r) => r.id));
+}
+
 // Reportes de errores atrapados por ErrorBoundary en el frontend (ver
 // ErrorBoundary.jsx) — sin esto, un error que sólo pasa en el teléfono de
 // alguien es imposible de diagnosticar porque no hay forma de abrir la
@@ -202,7 +267,7 @@ app.post('/api/client-errors', (req, res) => {
 
 // ---------- AUTH ----------
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', authLimiter, (req, res) => {
   const { name, email, password, petName, petSpecies, petBreed, petAge, petBio, lat, lng, acceptTerms } = req.body;
   if (!name || !email || !password || !petName || !petSpecies || !petBreed) {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
@@ -242,7 +307,7 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ ok: true, token });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authLimiter, (req, res) => {
   const { email, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
@@ -250,6 +315,41 @@ app.post('/api/auth/login', (req, res) => {
   }
   const token = signToken(user.id);
   res.json({ ok: true, token });
+});
+
+// Recuperar contraseña — paso 1: pedir el enlace por mail. Siempre
+// respondemos "ok" exista o no la cuenta (no confirmamos ni negamos si un
+// correo está registrado — evita que alguien use esto para averiguar qué
+// correos tienen cuenta en PawPals).
+app.post('/api/auth/request-reset', authLimiter, async (req, res) => {
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: 'Ingresá tu correo' });
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  if (user) {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?').run(token, expires, user.id);
+    const resetUrl = `${APP_URL}?resetToken=${token}`;
+    sendPasswordResetEmail(email, resetUrl).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+// Recuperar contraseña — paso 2: el enlace del mail trae el token en la URL.
+app.post('/api/auth/reset-password', authLimiter, (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ error: 'Faltan datos o la contraseña es demasiado corta (mínimo 6 caracteres)' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE reset_token = ?').get(token);
+  if (!user || !user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+    return res.status(400).json({ error: 'El enlace no es válido o ya venció. Pedí uno nuevo.' });
+  }
+  const newHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?')
+    .run(newHash, user.id);
+  res.json({ ok: true });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -380,6 +480,43 @@ app.patch('/api/pets/me/profile', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Cambiar contraseña desde Configuración — pide la actual como confirmación
+// (403, no 401, por la misma razón que en /api/me: la persona sigue
+// autenticada, sólo puede haber escrito mal la contraseña actual).
+app.patch('/api/me/password', requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ error: 'La nueva contraseña tiene que tener al menos 6 caracteres' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'No encontrado' });
+  if (!bcrypt.compareSync(currentPassword || '', user.password_hash)) {
+    return res.status(403).json({ error: 'Tu contraseña actual no es correcta' });
+  }
+  const newHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, req.userId);
+  res.json({ ok: true });
+});
+
+// Cambiar el correo de la cuenta — también pide la contraseña actual.
+app.patch('/api/me/email', requireAuth, (req, res) => {
+  const { newEmail, currentPassword } = req.body || {};
+  const email = String(newEmail || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Ingresá un correo válido' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'No encontrado' });
+  if (!bcrypt.compareSync(currentPassword || '', user.password_hash)) {
+    return res.status(403).json({ error: 'Tu contraseña actual no es correcta' });
+  }
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, req.userId);
+  if (existing) return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+
+  db.prepare('UPDATE users SET email = ? WHERE id = ?').run(email, req.userId);
+  res.json({ ok: true, email });
+});
+
 app.get('/api/pets/:id', requireAuth, (req, res) => {
   const petId = Number(req.params.id);
   const pet = db
@@ -411,6 +548,7 @@ app.get('/api/pets/:id', requireAuth, (req, res) => {
     distance_km: distanceKm,
     playdate_status: playdateStatus,
     is_following: myPet && myPet.id !== pet.id ? isFollowing(myPet.id, pet.id) : false,
+    is_blocked: myPet && myPet.id !== pet.id ? arePetsBlocked(myPet.id, pet.id) : false,
     stats: { posts: postsCount, followers: followerCount(pet.id), following: followingCount(pet.id) }
   });
 });
@@ -475,9 +613,72 @@ app.get('/api/pets/:id/following', requireAuth, (req, res) => {
   res.json(petListWithFollowInfo(rows, myPet ? myPet.id : null));
 });
 
+// ---------- BLOQUEOS ----------
+
+app.post('/api/pets/:id/block', requireAuth, (req, res) => {
+  const targetId = Number(req.params.id);
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.status(400).json({ error: 'Todavía no tienes una mascota configurada' });
+  if (myPet.id === targetId) return res.status(400).json({ error: 'No puedes bloquearte a ti mismo' });
+  const targetPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(targetId);
+  if (!targetPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+
+  const already = db
+    .prepare('SELECT id FROM blocks WHERE blocker_pet_id = ? AND blocked_pet_id = ?')
+    .get(myPet.id, targetId);
+
+  if (already) {
+    db.prepare('DELETE FROM blocks WHERE id = ?').run(already.id);
+    res.json({ blocked: false });
+  } else {
+    db.prepare('INSERT INTO blocks (blocker_pet_id, blocked_pet_id) VALUES (?, ?)').run(myPet.id, targetId);
+    // Bloquear implica dejar de seguirse mutuamente — no tendría sentido
+    // seguir "siguiendo" a alguien que ya no puede ver tu contenido.
+    db.prepare('DELETE FROM follows WHERE (follower_pet_id = ? AND followed_pet_id = ?) OR (follower_pet_id = ? AND followed_pet_id = ?)')
+      .run(myPet.id, targetId, targetId, myPet.id);
+    res.json({ blocked: true });
+  }
+});
+
+// Lista de mascotas bloqueadas por mí, para poder desbloquearlas desde
+// Configuración (si no, bloquear sería una acción sin vuelta atrás desde la UI).
+app.get('/api/pets/blocked/mine', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  if (!myPet) return res.json([]);
+  const rows = db
+    .prepare(
+      `SELECT pets.* FROM blocks JOIN pets ON pets.id = blocks.blocked_pet_id
+       WHERE blocks.blocker_pet_id = ? ORDER BY blocks.created_at DESC`
+    )
+    .all(myPet.id)
+    .map((p) => ({ id: p.id, name: p.name, species: p.species, color: p.color, photo_url: absoluteUploadUrl(req, p.photo_path) }));
+  res.json(rows);
+});
+
+// ---------- REPORTES ----------
+// Queda registrado en la tabla "reports" para que el equipo lo revise
+// después (no hay panel de moderación todavía — se puede consultar la
+// tabla directamente, o se agrega uno más adelante si hace falta).
+app.post('/api/reports', requireAuth, writeLimiter, (req, res) => {
+  const { targetType, targetId, reason, details } = req.body || {};
+  const validTypes = ['post', 'comment', 'pet'];
+  if (!validTypes.includes(targetType) || !Number.isFinite(Number(targetId))) {
+    return res.status(400).json({ error: 'Reporte inválido' });
+  }
+  if (!reason || !String(reason).trim()) {
+    return res.status(400).json({ error: 'Elegí un motivo para el reporte' });
+  }
+  db.prepare(
+    'INSERT INTO reports (reporter_user_id, target_type, target_id, reason, details) VALUES (?, ?, ?, ?, ?)'
+  ).run(req.userId, targetType, Number(targetId), String(reason).slice(0, 100), details ? String(details).slice(0, 500) : null);
+  res.json({ ok: true });
+});
+
 // ---------- FEED ----------
 
 app.get('/api/feed', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  const blocked = blockedPetIdsFor(myPet ? myPet.id : null);
   const rows = db
     .prepare(
       `SELECT posts.id, posts.caption, posts.media, posts.image_path, posts.comments_disabled, posts.created_at,
@@ -495,7 +696,11 @@ app.get('/api/feed', requireAuth, (req, res) => {
        WHERE posts.post_type = 'post'
        ORDER BY posts.created_at DESC, posts.id DESC`
     )
-    .all(req.userId);
+    .all(req.userId)
+    // Publicaciones de alguien bloqueado (en cualquier sentido) no aparecen
+    // en el feed. No filtramos por SQL para no complicar la consulta (el
+    // bloqueo es una tabla chica, filtrar en JS después alcanza de sobra).
+    .filter((r) => !blocked.has(r.pet_id));
 
   res.json(
     rows.map((r) => ({
@@ -535,7 +740,7 @@ app.post('/api/posts/:id/toggle-comments', requireAuth, (req, res) => {
   res.json({ comments_disabled: !!newValue });
 });
 
-app.post('/api/posts', requireAuth, (req, res, next) => {
+app.post('/api/posts', requireAuth, writeLimiter, (req, res, next) => {
   upload.single('photo')(req, res, (err) => {
     if (err) return res.status(400).json({ error: uploadErrorMessage(err, IMAGE_MAX_MB) });
     next();
@@ -560,33 +765,44 @@ app.get('/api/posts/:id/comments', requireAuth, (req, res) => {
   const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
   if (!post) return res.status(404).json({ error: 'Publicación no encontrada' });
 
+  const myPet = getPetByOwner(req.userId);
+  const blocked = blockedPetIdsFor(myPet ? myPet.id : null);
+
   const rows = db
     .prepare(
-      `SELECT comments.id, comments.body, comments.created_at,
+      `SELECT comments.id, comments.body, comments.created_at, comments.edited_at,
               pets.id AS pet_id, pets.name AS pet_name, pets.species, pets.color, pets.photo_path
        FROM comments
        JOIN pets ON pets.id = comments.pet_id
        WHERE comments.post_id = ?
        ORDER BY comments.created_at ASC, comments.id ASC`
     )
-    .all(postId);
+    .all(postId)
+    .filter((r) => !blocked.has(r.pet_id));
 
-  res.json(rows.map((r) => ({ ...r, photo_url: absoluteUploadUrl(req, r.photo_path) })));
+  res.json(rows.map((r) => ({
+    ...r,
+    is_mine: myPet ? r.pet_id === myPet.id : false,
+    photo_url: absoluteUploadUrl(req, r.photo_path)
+  })));
 });
 
-app.post('/api/posts/:id/comments', requireAuth, (req, res) => {
+app.post('/api/posts/:id/comments', requireAuth, writeLimiter, (req, res) => {
   const postId = Number(req.params.id);
   const { body } = req.body;
   if (!body || !body.trim()) return res.status(400).json({ error: 'El comentario no puede estar vacío' });
 
   const post = db
-    .prepare('SELECT posts.id, posts.comments_disabled, pets.owner_id FROM posts JOIN pets ON pets.id = posts.pet_id WHERE posts.id = ?')
+    .prepare('SELECT posts.id, posts.comments_disabled, posts.pet_id AS post_pet_id, pets.owner_id FROM posts JOIN pets ON pets.id = posts.pet_id WHERE posts.id = ?')
     .get(postId);
   if (!post) return res.status(404).json({ error: 'Publicación no encontrada' });
   if (post.comments_disabled) return res.status(403).json({ error: 'Los comentarios están desactivados para esta publicación' });
 
   const pet = getPetByOwner(req.userId);
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+  if (arePetsBlocked(pet.id, post.post_pet_id)) {
+    return res.status(403).json({ error: 'No podés comentar en esta publicación' });
+  }
 
   const info = db
     .prepare('INSERT INTO comments (post_id, pet_id, body) VALUES (?, ?, ?)')
@@ -596,14 +812,64 @@ app.post('/api/posts/:id/comments', requireAuth, (req, res) => {
 
   const comment = db
     .prepare(
-      `SELECT comments.id, comments.body, comments.created_at,
+      `SELECT comments.id, comments.body, comments.created_at, comments.edited_at,
               pets.id AS pet_id, pets.name AS pet_name, pets.species, pets.color, pets.photo_path
        FROM comments JOIN pets ON pets.id = comments.pet_id
        WHERE comments.id = ?`
     )
     .get(info.lastInsertRowid);
 
-  res.json({ ...comment, photo_url: absoluteUploadUrl(req, comment.photo_path) });
+  res.json({ ...comment, is_mine: true, photo_url: absoluteUploadUrl(req, comment.photo_path) });
+});
+
+// Editar un comentario propio (sólo quien lo escribió — ni siquiera el
+// dueño de la publicación puede editar el comentario de otra persona,
+// aunque sí puede borrarlo, ver más abajo).
+app.patch('/api/comments/:id', requireAuth, (req, res) => {
+  const commentId = Number(req.params.id);
+  const { body } = req.body || {};
+  if (!body || !body.trim()) return res.status(400).json({ error: 'El comentario no puede estar vacío' });
+
+  const comment = db
+    .prepare('SELECT comments.*, pets.owner_id FROM comments JOIN pets ON pets.id = comments.pet_id WHERE comments.id = ?')
+    .get(commentId);
+  if (!comment) return res.status(404).json({ error: 'Comentario no encontrado' });
+  if (comment.owner_id !== req.userId) return res.status(403).json({ error: 'No puedes editar un comentario que no es tuyo' });
+
+  db.prepare("UPDATE comments SET body = ?, edited_at = datetime('now') WHERE id = ?")
+    .run(body.trim().slice(0, 280), commentId);
+
+  const updated = db
+    .prepare(
+      `SELECT comments.id, comments.body, comments.created_at, comments.edited_at,
+              pets.id AS pet_id, pets.name AS pet_name, pets.species, pets.color, pets.photo_path
+       FROM comments JOIN pets ON pets.id = comments.pet_id WHERE comments.id = ?`
+    )
+    .get(commentId);
+  res.json({ ...updated, is_mine: true, photo_url: absoluteUploadUrl(req, updated.photo_path) });
+});
+
+// Borrar un comentario: puede hacerlo quien lo escribió, o el dueño de la
+// publicación (igual que Instagram — el dueño de un post puede moderar sus
+// propios comentarios aunque no los haya escrito él).
+app.delete('/api/comments/:id', requireAuth, (req, res) => {
+  const commentId = Number(req.params.id);
+  const comment = db
+    .prepare(
+      `SELECT comments.id, comments.post_id, pets.owner_id AS comment_owner_id, postpets.owner_id AS post_owner_id
+       FROM comments
+       JOIN pets ON pets.id = comments.pet_id
+       JOIN posts ON posts.id = comments.post_id
+       JOIN pets postpets ON postpets.id = posts.pet_id
+       WHERE comments.id = ?`
+    )
+    .get(commentId);
+  if (!comment) return res.status(404).json({ error: 'Comentario no encontrado' });
+  if (comment.comment_owner_id !== req.userId && comment.post_owner_id !== req.userId) {
+    return res.status(403).json({ error: 'No puedes eliminar este comentario' });
+  }
+  db.prepare('DELETE FROM comments WHERE id = ?').run(commentId);
+  res.json({ ok: true, post_id: comment.post_id });
 });
 
 app.post('/api/posts/:id/like', requireAuth, (req, res) => {
@@ -634,12 +900,15 @@ app.get('/api/nearby', requireAuth, (req, res) => {
   const myPet = getPetByOwner(req.userId);
   if (!myPet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
 
+  const blocked = blockedPetIdsFor(myPet.id);
+
   const others = db
     .prepare(
       `SELECT pets.*, users.name AS owner_name FROM pets JOIN users ON users.id = pets.owner_id
        WHERE pets.owner_id != ? AND pets.share_location = 1`
     )
-    .all(req.userId);
+    .all(req.userId)
+    .filter((p) => !blocked.has(p.id));
 
   const sentRequests = db
     .prepare('SELECT target_pet_id, status FROM playdates WHERE requester_pet_id = ?')
@@ -755,7 +1024,7 @@ app.patch('/api/playdates/:id', requireAuth, (req, res) => {
 
 // ---------- HISTORIAS ----------
 
-app.post('/api/stories', requireAuth, (req, res, next) => {
+app.post('/api/stories', requireAuth, writeLimiter, (req, res, next) => {
   uploadStory.fields([{ name: 'media', maxCount: 1 }, { name: 'music', maxCount: 1 }])(req, res, (err) => {
     if (err) return res.status(400).json({ error: uploadErrorMessage(err, STORY_MAX_MB) });
     next();
@@ -837,7 +1106,7 @@ app.get('/api/stories', requireAuth, (req, res) => {
 
 // ---------- REELS ----------
 
-app.post('/api/reels', requireAuth, (req, res, next) => {
+app.post('/api/reels', requireAuth, writeLimiter, (req, res, next) => {
   uploadReel.single('video')(req, res, (err) => {
     if (err) return res.status(400).json({ error: uploadErrorMessage(err, REEL_MAX_MB) });
     next();
@@ -857,6 +1126,8 @@ app.post('/api/reels', requireAuth, (req, res, next) => {
 });
 
 app.get('/api/reels', requireAuth, (req, res) => {
+  const myPet = getPetByOwner(req.userId);
+  const blocked = blockedPetIdsFor(myPet ? myPet.id : null);
   const rows = db
     .prepare(
       `SELECT posts.id, posts.caption, posts.video_path, posts.overlays, posts.created_at,
@@ -869,7 +1140,8 @@ app.get('/api/reels', requireAuth, (req, res) => {
        WHERE posts.post_type = 'reel'
        ORDER BY posts.created_at DESC, posts.id DESC`
     )
-    .all(req.userId);
+    .all(req.userId)
+    .filter((r) => !blocked.has(r.pet_id));
 
   res.json(
     rows.map((r) => {
@@ -972,7 +1244,8 @@ app.get('/api/conversations', requireAuth, (req, res) => {
     byPartner.set(partnerId, entry);
   }
 
-  const partnerIds = [...byPartner.keys()];
+  const blocked = blockedPetIdsFor(myPet.id);
+  const partnerIds = [...byPartner.keys()].filter((id) => !blocked.has(id));
   if (partnerIds.length === 0) return res.json([]);
 
   const placeholders = partnerIds.map(() => '?').join(',');
@@ -1015,6 +1288,7 @@ app.get('/api/conversations/:petId/messages', requireAuth, (req, res) => {
   const partnerId = Number(req.params.petId);
   const partnerPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(partnerId);
   if (!partnerPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+  if (arePetsBlocked(myPet.id, partnerId)) return res.status(403).json({ error: 'No podés ver esta conversación' });
 
   db.prepare('UPDATE messages SET is_read = 1 WHERE recipient_pet_id = ? AND sender_pet_id = ? AND is_read = 0').run(
     myPet.id,
@@ -1046,13 +1320,14 @@ app.get('/api/conversations/:petId/messages', requireAuth, (req, res) => {
   });
 });
 
-app.post('/api/conversations/:petId/messages', requireAuth, (req, res) => {
+app.post('/api/conversations/:petId/messages', requireAuth, writeLimiter, (req, res) => {
   const myPet = getPetByOwner(req.userId);
   if (!myPet) return res.status(400).json({ error: 'Todavía no tienes una mascota configurada' });
   const partnerId = Number(req.params.petId);
   if (partnerId === myPet.id) return res.status(400).json({ error: 'No puedes enviarte un mensaje a ti mismo' });
   const partnerPet = db.prepare('SELECT * FROM pets WHERE id = ?').get(partnerId);
   if (!partnerPet) return res.status(404).json({ error: 'Mascota no encontrada' });
+  if (arePetsBlocked(myPet.id, partnerId)) return res.status(403).json({ error: 'No podés enviarle mensajes a esta mascota' });
 
   const body = ((req.body && req.body.body) || '').trim();
   if (!body) return res.status(400).json({ error: 'Escribe un mensaje' });

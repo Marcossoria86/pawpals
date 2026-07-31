@@ -22,11 +22,13 @@ function getBrowserLocation() {
 }
 
 export default function AuthView({ onAuthenticated }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [legalOpen, setLegalOpen] = useState(null); // null | 'terms' | 'privacy'
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -77,12 +79,28 @@ export default function AuthView({ onAuthenticated }) {
     }
   }
 
+  async function handleForgotSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await api.requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-title"><IconPawPair size={22} /> PawPals</div>
         <div className="auth-sub">
-          {mode === 'login' ? 'Entra a tu cuenta' : 'Crea tu cuenta y el perfil de tu mascota'}
+          {mode === 'login' && 'Entra a tu cuenta'}
+          {mode === 'register' && 'Crea tu cuenta y el perfil de tu mascota'}
+          {mode === 'forgot' && 'Recuperá tu contraseña'}
         </div>
 
         {error && <div className="error-box">{error}</div>}
@@ -90,7 +108,29 @@ export default function AuthView({ onAuthenticated }) {
           <div className="hint-box">Demo: camila@example.com / pawpals123</div>
         )}
 
-        {mode === 'login' ? (
+        {mode === 'forgot' ? (
+          forgotSent ? (
+            <>
+              <p className="settings-help-text">
+                Si ese correo está registrado, te mandamos un enlace para elegir una nueva contraseña. Revisá tu bandeja de entrada (y spam).
+              </p>
+              <button className="primary-btn" type="button" onClick={() => { setMode('login'); setForgotSent(false); setForgotEmail(''); }}>
+                Volver a iniciar sesión
+              </button>
+            </>
+          ) : (
+            <form onSubmit={handleForgotSubmit}>
+              <div className="field">
+                <label>Correo de tu cuenta</label>
+                <input type="email" required value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)} />
+              </div>
+              <button className="primary-btn" disabled={loading}>
+                {loading ? 'Enviando…' : 'Enviar enlace de recuperación'}
+              </button>
+            </form>
+          )
+        ) : mode === 'login' ? (
           <form onSubmit={handleLogin}>
             <div className="field">
               <label>Correo</label>
@@ -104,6 +144,9 @@ export default function AuthView({ onAuthenticated }) {
             </div>
             <button className="primary-btn" disabled={loading}>
               {loading ? 'Entrando…' : 'Entrar'}
+            </button>
+            <button type="button" className="terms-link forgot-pw-link" onClick={() => { setMode('forgot'); setError(''); }}>
+              ¿Olvidaste tu contraseña?
             </button>
           </form>
         ) : (
@@ -182,13 +225,15 @@ export default function AuthView({ onAuthenticated }) {
           </form>
         )}
 
-        <div className="switch-auth">
-          {mode === 'login' ? (
-            <>¿No tienes cuenta? <button onClick={() => setMode('register')}>Regístrate</button></>
-          ) : (
-            <>¿Ya tienes cuenta? <button onClick={() => setMode('login')}>Entra</button></>
-          )}
-        </div>
+        {mode !== 'forgot' && (
+          <div className="switch-auth">
+            {mode === 'login' ? (
+              <>¿No tienes cuenta? <button onClick={() => setMode('register')}>Regístrate</button></>
+            ) : (
+              <>¿Ya tienes cuenta? <button onClick={() => setMode('login')}>Entra</button></>
+            )}
+          </div>
+        )}
       </div>
       {legalOpen && <LegalModal kind={legalOpen} onClose={() => setLegalOpen(null)} />}
     </div>

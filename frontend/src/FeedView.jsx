@@ -5,10 +5,11 @@ import PetIllustration from './PetIllustration';
 import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
+import ReportModal from './ReportModal';
 import MediaPicker from './MediaPicker';
 import ImageCropper from './ImageCropper';
 import ErrorBoundary from './ErrorBoundary';
-import { IconHeart, IconShare } from './Icons';
+import { IconHeart, IconShare, IconFlag } from './Icons';
 
 function timeAgo(isoLike) {
   const date = new Date(isoLike.replace(' ', 'T') + 'Z');
@@ -34,6 +35,8 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
   const [sharing, setSharing] = useState(false);
   const [composeHidden, setComposeHidden] = useState(false);
   const [cropFile, setCropFile] = useState(null);
+  const [reportPostId, setReportPostId] = useState(null);
+  const [openMenuPostId, setOpenMenuPostId] = useState(null);
   const lastScrollY = useRef(0);
 
   async function load() {
@@ -220,12 +223,30 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
                 <div className="post-meta">{post.breed} · {timeAgo(post.created_at)}</div>
               </div>
             </button>
-            {post.is_mine && (
+            {post.is_mine ? (
               <PostMenu
                 commentsDisabled={post.comments_disabled}
                 onDelete={() => handleDeletePost(post.id)}
                 onToggleComments={() => handleToggleComments(post.id)}
               />
+            ) : (
+              <div className="post-menu">
+                <button
+                  type="button"
+                  className="post-menu-btn"
+                  aria-label="Más opciones"
+                  onClick={() => setOpenMenuPostId((v) => (v === post.id ? null : post.id))}
+                >
+                  ⋮
+                </button>
+                {openMenuPostId === post.id && (
+                  <div className="post-menu-dropdown">
+                    <button type="button" onClick={() => { setOpenMenuPostId(null); setReportPostId(post.id); }}>
+                      <IconFlag size={15} /> Reportar publicación
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           {!post.shared_post_id && (
@@ -264,6 +285,7 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
               postId={post.id}
               commentsCount={post.comments_count || 0}
               disabled={post.comments_disabled}
+              isPostOwner={post.is_mine}
               showToast={showToast}
               onCountChange={handleCommentCountChange}
             />
@@ -308,6 +330,15 @@ export default function FeedView({ showToast, searchQuery = '', onViewPet, scrol
             onCancel={() => setCropFile(null)}
           />
         </ErrorBoundary>
+      )}
+
+      {reportPostId !== null && (
+        <ReportModal
+          targetType="post"
+          targetId={reportPostId}
+          onClose={() => setReportPostId(null)}
+          showToast={showToast}
+        />
       )}
     </section>
   );
