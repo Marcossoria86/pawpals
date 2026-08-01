@@ -251,44 +251,46 @@ function App() {
           />
         ) : (
           <button type="button" className="logo logo-btn" onClick={goHome} title="Ir al inicio">
-            <IconPawPair size={20} /> PawPals
+            <IconPawPair size={26} /> PawPals
           </button>
         )}
-        {!searchOpen && (
-          <div className="header-plus-wrap">
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setPlusMenuOpen((v) => !v)}
-              title="Crear"
-              aria-label="Crear"
-            >
-              <IconPlus size={22} />
+        <div className="appbar-actions">
+          {!searchOpen && (
+            <div className="header-plus-wrap">
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setPlusMenuOpen((v) => !v)}
+                title="Crear"
+                aria-label="Crear"
+              >
+                <IconPlus size={22} />
+              </button>
+              {plusMenuOpen && (
+                <div className="header-plus-dropdown">
+                  <button type="button" onClick={openNewPost}>
+                    <IconGallery size={17} /> Publicación
+                  </button>
+                  <button type="button" onClick={() => openQuickPicker('story')}>
+                    <IconCamera size={17} /> Historia
+                  </button>
+                  <button type="button" onClick={() => openQuickPicker('reel')}>
+                    <IconReels /> Reel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {searchableTab && (
+            <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={18} /> : <IconSearch size={20} />}</div>
+          )}
+          {!searchOpen && tab !== 'messages' && (
+            <button type="button" className="icon-btn messages-icon-btn" onClick={() => selectTab('messages')} title="Mensajes" aria-label="Mensajes">
+              <IconMessages size={22} />
+              {unreadMessages > 0 && <span className="tab-badge header-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}
             </button>
-            {plusMenuOpen && (
-              <div className="header-plus-dropdown">
-                <button type="button" onClick={openNewPost}>
-                  <IconGallery size={17} /> Publicación
-                </button>
-                <button type="button" onClick={() => openQuickPicker('story')}>
-                  <IconCamera size={17} /> Historia
-                </button>
-                <button type="button" onClick={() => openQuickPicker('reel')}>
-                  <IconReels /> Reel
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {searchableTab && (
-          <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={18} /> : <IconSearch size={20} />}</div>
-        )}
-        {!searchOpen && tab !== 'messages' && (
-          <button type="button" className="icon-btn messages-icon-btn" onClick={() => selectTab('messages')} title="Mensajes" aria-label="Mensajes">
-            <IconMessages size={22} />
-            {unreadMessages > 0 && <span className="tab-badge header-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}
-          </button>
-        )}
+          )}
+        </div>
       </header>
 
       <main

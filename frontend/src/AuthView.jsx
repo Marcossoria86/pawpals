@@ -103,6 +103,16 @@ export default function AuthView({ onAuthenticated }) {
           {mode === 'forgot' && 'Recuperá tu contraseña'}
         </div>
 
+        {mode === 'forgot' && (
+          <button
+            type="button"
+            className="back-link"
+            onClick={() => { setMode('login'); setError(''); setForgotEmail(''); }}
+          >
+            ← Volver
+          </button>
+        )}
+
         {error && <div className="error-box">{error}</div>}
         {mode === 'login' && (
           <div className="hint-box">Demo: camila@example.com / pawpals123</div>

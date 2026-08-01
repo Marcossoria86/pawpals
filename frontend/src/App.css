@@ -83,6 +83,15 @@ header.appbar{
   position:relative;
   flex-shrink:0;
 }
+/* Agrupa +/lupa/mensajes pegados a la derecha del header (antes,
+   justify-content:space-between del .appbar los repartía con espacios
+   parejos entre CADA uno, en vez de dejarlos juntos como un solo grupo). */
+.appbar-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:auto;
+}
 /* Botón "+" del header (nueva publicación/historia/reel, estilo Facebook) y
    su menú desplegable. */
 .header-plus-wrap{ position:relative; }
@@ -396,7 +405,13 @@ main{
 .postnew-modal{
   position:fixed;
   inset:0;
-  z-index:115;
+  /* Tiene que quedar POR DEBAJO del selector de fotos (picker-modal,
+     z-index:110) y de los diálogos genéricos (modal-backdrop, más abajo en
+     este archivo) — porque desde acá adentro se puede abrir el selector de
+     fotos y después el recorte, y esas pantallas tienen que taparla a ELLA,
+     no al revés. Con 115 (más alto que el picker) el botón "Foto" no hacía
+     nada visible: el selector se abría igual, pero quedaba tapado detrás. */
+  z-index:108;
   background:#0b0b0c;
   color:#fff;
   display:flex;
@@ -1416,7 +1431,11 @@ main.no-pad{ padding:0; }
   position:fixed;
   inset:0;
   background:rgba(0,0,0,0.5);
-  z-index:50;
+  /* Más alto que el selector de fotos (110) y que la pantalla de "Nueva
+     publicación" (108): este backdrop genérico es el que usan el recorte de
+     foto y el editor de texto/stickers, que siempre son el ÚLTIMO paso
+     dentro de esas otras pantallas — tienen que quedar por encima. */
+  z-index:130;
   display:flex;
   align-items:center;
   justify-content:center;
