@@ -737,7 +737,9 @@ app.get('/api/pets/:id/posts', requireAuth, (req, res) => {
               (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
               EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS liked_by_me,
               orig.caption AS shared_caption, orig.image_path AS shared_image_path,
-              origpet.name AS shared_pet_name, origpet.species AS shared_species, origpet.color AS shared_color
+              orig.created_at AS shared_created_at,
+              origpet.id AS shared_pet_id, origpet.name AS shared_pet_name, origpet.species AS shared_species,
+              origpet.breed AS shared_breed, origpet.color AS shared_color, origpet.photo_path AS shared_photo_path
        FROM posts
        JOIN pets ON pets.id = posts.pet_id
        LEFT JOIN posts orig ON orig.id = posts.shared_post_id
@@ -758,6 +760,7 @@ app.get('/api/pets/:id/posts', requireAuth, (req, res) => {
       image_url: absoluteUploadUrl(req, r.image_path),
       pet_photo_url: absoluteUploadUrl(req, r.photo_path),
       shared_image_url: absoluteUploadUrl(req, r.shared_image_path),
+      shared_pet_photo_url: absoluteUploadUrl(req, r.shared_photo_path),
       tagged_pets: taggedPetsFor(req, tagMap, r.id)
     }))
   );
@@ -958,7 +961,9 @@ app.get('/api/feed', requireAuth, (req, res) => {
               (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
               EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS liked_by_me,
               orig.caption AS shared_caption, orig.image_path AS shared_image_path,
-              origpet.name AS shared_pet_name, origpet.species AS shared_species, origpet.color AS shared_color
+              orig.created_at AS shared_created_at,
+              origpet.id AS shared_pet_id, origpet.name AS shared_pet_name, origpet.species AS shared_species,
+              origpet.breed AS shared_breed, origpet.color AS shared_color, origpet.photo_path AS shared_photo_path
        FROM posts
        JOIN pets ON pets.id = posts.pet_id
        LEFT JOIN posts orig ON orig.id = posts.shared_post_id
@@ -983,6 +988,7 @@ app.get('/api/feed', requireAuth, (req, res) => {
       image_url: absoluteUploadUrl(req, r.image_path),
       pet_photo_url: absoluteUploadUrl(req, r.photo_path),
       shared_image_url: absoluteUploadUrl(req, r.shared_image_path),
+      shared_pet_photo_url: absoluteUploadUrl(req, r.shared_photo_path),
       tagged_pets: taggedPetsFor(req, tagMap, r.id)
     }))
   );

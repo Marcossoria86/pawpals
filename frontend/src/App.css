@@ -84,17 +84,21 @@ header.appbar{
   border-color: var(--brand);
 }
 .icon-btn{
+  /* Antes tenían un círculo de fondo (background+border+radius:50%) detrás
+     del dibujo — a pedido del usuario ahora es solo el ícono "pelado", sin
+     círculo, con el trazo más grueso para que siga siendo bien visible sin
+     el fondo que antes le daba contraste. */
   width:40px;height:40px;
-  border-radius:50%;
-  background:var(--card);
-  border:1px solid var(--line);
+  background:none;
+  border:none;
   display:flex;align-items:center;justify-content:center;
   font-size:18px;
-  color:var(--ink-soft);
+  color:var(--ink);
   cursor:pointer;
   position:relative;
   flex-shrink:0;
 }
+.icon-btn svg{ stroke-width:2.6; }
 /* Agrupa +/lupa/mensajes pegados a la derecha del header (antes,
    justify-content:space-between del .appbar los repartía con espacios
    parejos entre CADA uno, en vez de dejarlos juntos como un solo grupo). */
@@ -176,7 +180,18 @@ main{
   width:100%;
 }
 main:not(.no-pad).main-tabbar-hidden{
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  /* OJO, esto es la causa real de la "barra gris" que se seguía viendo:
+     esta franja de abajo de <main> NO tiene fondo propio (hereda el gris de
+     --bg de .phone), mientras que cada publicación SÍ tiene fondo blanco
+     (var(--card), ver .post). Con la barra de navegación escondida, lo que
+     sobraba de este padding (antes con env(safe-area-inset-bottom) sumado,
+     ósea unos 40-50px en un iPhone con Face ID) se veía como una franja
+     gris bien marcada pegada abajo del todo, distinta del blanco de los
+     posts — exactamente lo que se reportó. No hace falta reservar el
+     margen de seguridad del iPhone acá: sin una barra fija de por medio,
+     no hay nada que ese margen deba esquivar (así se ve Instagram/Facebook
+     también — el contenido llega hasta el borde real). */
+  padding-bottom: 4px;
 }
 
 
@@ -1051,6 +1066,13 @@ main:not(.no-pad).main-tabbar-hidden{
   align-items:center;
   justify-content:center;
   cursor:pointer;
+  /* .profile-avatar (el círculo de al lado) tiene z-index:2 desde que le
+     agregamos el anillo blanco para que se recorte bien sobre la portada —
+     sin esto, ese anillo quedaba ARRIBA de este botón en la esquina donde
+     se superponen, y lo tapaba a medias (se veía como una "ruedita"
+     mordida/deforme en vez de un círculo entero). Con z-index más alto acá,
+     el botón de cámara siempre queda completo y por encima. */
+  z-index:3;
 }
 .profile-photo-btn:disabled{
   opacity:0.6;
@@ -1438,7 +1460,16 @@ main.no-pad{ padding:0; }
   width:100%;
   max-width:420px;
   height:100%;
-  max-height:844px;
+  /* OJO: antes esto tenía max-height:844px fijo (pensado para no verse
+     gigante en el mockup de escritorio) SIEMPRE, también en celular. En
+     cualquier teléfono más alto que 844px de CSS (los "Pro Max"/"Plus"
+     llegan a 926-932px) esto topaba el visor bastante antes del borde real
+     de la pantalla, y como .story-viewer lo centra verticalmente dentro de
+     .phone (que sí ocupa el alto real del dispositivo), quedaba un
+     colchón vacío — mostrando el fondo claro del body/.phone detrás en vez
+     de negro, como reportó el usuario ("la barra gris/blanca en
+     historias"). El tope de 844px se movió a la media query de escritorio
+     de más abajo, que es el único caso donde hace falta. */
   background:#000;
   display:flex;
   flex-direction:column;
@@ -1538,7 +1569,7 @@ main.no-pad{ padding:0; }
    lista tiene su propio scroll propio con overflow-y, no usa el padding de
    main). */
 .messages-list-pad{ padding:12px 16px calc(90px + env(safe-area-inset-bottom)); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
-main.main-tabbar-hidden .messages-list-pad{ padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+main.main-tabbar-hidden .messages-list-pad{ padding-bottom: 4px; }
 .conversation-row{
   width:100%;
   display:flex;
@@ -2288,31 +2319,39 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   justify-content:space-between;
 }
 
-/* ---------- Publicación compartida (anidada) ---------- */
+/* ---------- Publicación compartida (anidada) ----------
+   Pedido del usuario: que la publicación compartida se vea "como un feed"
+   (como una mini publicación real adentro, con su propio header de
+   mascota/foto+nombre+raza+fecha, no como una cajita chica aparte). Por eso
+   reusa el mismo patrón visual que .post (tarjeta con borde, header con
+   avatar, foto a todo el ancho) en vez de estar apretada. */
 .shared-embed{
   border:1px solid var(--line);
-  border-radius:12px;
-  margin:0 14px 12px;
+  border-radius:14px;
+  margin:2px 14px 4px;
   overflow:hidden;
-  background:var(--surface-alt);
+  background:var(--card);
 }
 .shared-embed-head{
   display:flex;
   align-items:center;
-  gap:8px;
-  padding:8px 10px;
+  gap:10px;
+  padding:10px 12px;
+  width:100%;
+  max-width:100%;
 }
-.shared-embed-name{ font-size:12.5px; font-weight:700; color:var(--ink); }
 .shared-embed-photo{
   width:100%;
-  max-height:220px;
+  max-height:320px;
   object-fit:cover;
   display:block;
+  background:var(--surface-alt);
 }
 .shared-embed-caption{
-  padding: 0 10px 10px;
-  font-size:12.5px;
-  color:var(--ink-soft);
+  padding: 10px 12px 12px;
+  font-size:13.5px;
+  color:var(--ink);
+  line-height:1.35;
 }
 
 /* ---------- Reels ---------- */
@@ -2606,6 +2645,9 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   .reels-wrap{
     max-width:480px;
     margin:0 auto;
+  }
+  .story-viewer-inner{
+    max-height:844px;
   }
 }
 

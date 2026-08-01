@@ -34,6 +34,17 @@ function normalizeAngle(deg) {
   return d;
 }
 
+// Antes, al abrir el recorte sin tocar el pellizco de zoom, la foto se
+// mostraba exactamente "a medida" del marco (cubriéndolo justo, sin
+// sobrante) — así que si la foto tenía casi la misma proporción que el
+// marco, uno de los dos ejes (típicamente el vertical) quedaba sin ningún
+// margen para arrastrar: quedaba "pegada" y no se podía reencuadrar en esa
+// dirección hasta pellizcar para agrandarla primero. Con este 18% de
+// sobrante de fábrica, la foto siempre entra un poco más grande que el
+// marco por los cuatro lados, así que siempre hay margen para arrastrarla
+// en cualquier dirección (vertical incluida) sin necesitar zoom primero.
+const MIN_OVERSCAN = 1.18;
+
 // Cuánto hay que agrandar la foto (además del zoom que ya eligió la
 // persona) para que, al girarla "rotationDeg" grados, siga tapando todo el
 // marco sin dejar huecos transparentes en las esquinas — el mismo problema
@@ -126,7 +137,7 @@ export default function ImageCropper({
 
   function computeDisplayed(scaleMultiplier, size) {
     if (!natural) return { w: 0, h: 0 };
-    const base = Math.max(size.width / natural.w, size.height / natural.h);
+    const base = Math.max(size.width / natural.w, size.height / natural.h) * MIN_OVERSCAN;
     const eff = base * scaleMultiplier;
     return { w: natural.w * eff, h: natural.h * eff };
   }
@@ -154,7 +165,7 @@ export default function ImageCropper({
     const w = e.target.naturalWidth;
     const h = e.target.naturalHeight;
     setNatural({ w, h });
-    const base = Math.max(containerSize.width / w, containerSize.height / h);
+    const base = Math.max(containerSize.width / w, containerSize.height / h) * MIN_OVERSCAN;
     const dW = w * base;
     const dH = h * base;
     setOffset({ x: (containerSize.width - dW) / 2, y: (containerSize.height - dH) / 2 });

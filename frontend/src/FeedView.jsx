@@ -258,13 +258,18 @@ export default function FeedView({
               <div className="shared-embed">
                 {post.shared_pet_name ? (
                   <>
-                    <div className="shared-embed-head">
-                      <div className="avatar" style={{ width: 28, height: 28, background: post.shared_color }}>
-                        <PetIllustration species={post.shared_species} size={18} />
+                    <button className="post-head-link shared-embed-head" onClick={() => onViewPet?.(post.shared_pet_id)}>
+                      <PetAvatar photoUrl={post.shared_pet_photo_url} species={post.shared_species} color={post.shared_color} size={36} />
+                      <div>
+                        <div className="post-name">{post.shared_pet_name}</div>
+                        <div className="post-meta">{post.shared_breed} · {timeAgo(post.shared_created_at)}</div>
                       </div>
-                      <span className="shared-embed-name">{post.shared_pet_name}</span>
-                    </div>
-                    {post.shared_image_url && <img className="shared-embed-photo" src={post.shared_image_url} alt="" />}
+                    </button>
+                    {post.shared_image_url
+                      ? <img className="shared-embed-photo" src={post.shared_image_url} alt={post.shared_caption || ''} />
+                      : post.shared_pet_photo_url && (
+                        <img className="shared-embed-photo" src={post.shared_pet_photo_url} alt={post.shared_caption || ''} />
+                      )}
                     {post.shared_caption && <div className="shared-embed-caption">{post.shared_caption}</div>}
                   </>
                 ) : (
