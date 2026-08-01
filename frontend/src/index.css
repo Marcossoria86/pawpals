@@ -111,6 +111,29 @@ html,body{
   touch-action: manipulation;
   width:100%;
 }
+/* LA FRANJA GRIS DE VERDAD (después de 4 intentos con .phone/nav/padding,
+   que en Chromium siempre se veían bien pero en el iPhone instalado como
+   PWA seguían fallando): no era ningún cálculo de alto de .phone ni del
+   nav — era el "rebote" elástico nativo de iOS (rubber-banding). Aunque
+   .phone tiene overflow:hidden y su propio alto fijo, eso sólo contiene a
+   SUS hijos; no le impide al documento ENTERO (html/body, el WKWebView de
+   la PWA instalada) rebotar un poquito cuando arrastrás el dedo — algo que
+   en una pestaña normal de Safari no se nota (la barra de direcciones "se
+   come" ese rebote visualmente) pero en la app instalada, sin esa barra,
+   se ve como un hueco gris que aparece justo al scrollear, exactamente
+   donde estaba la barra de navegación. Esto es invisible en las pruebas
+   con Chromium (no simula el rebote elástico de iOS), así que ninguno de
+   los intentos anteriores lo iba a detectar. La solución estándar para
+   esto en apps instaladas de iOS es "clavar" el documento entero con
+   position:fixed + overflow:hidden, para que sea IMPOSIBLE que rebote —
+   todo el scroll de verdad pasa a estar encerrado adentro de <main> (que
+   ya tenía su propio overflow-y:auto), nunca en el documento. */
+html,body{
+  position:fixed;
+  inset:0;
+  overflow:hidden;
+  overscroll-behavior:none;
+}
 body{
   margin:0;
   font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

@@ -194,7 +194,7 @@ main{
      a sobrar del todo: no hay nada que tapar, así que se achica a casi
      nada para que el feed llegue de verdad hasta el borde de la pantalla,
      sin ninguna franja — es lo que se pidió explícitamente. */
-  padding: 12px 16px var(--navbar-h, calc(90px + env(safe-area-inset-bottom)));
+  padding: 12px 16px var(--navbar-h, calc(90px + min(env(safe-area-inset-bottom), 40px)));
   transition: padding-bottom .22s ease;
   text-align:left;
   width:100%;
@@ -1249,11 +1249,34 @@ nav.tabbar{
   background:var(--card);
   border-top:1px solid var(--line);
   display:flex;
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  /* min(env(...), 40px): un techo/tope de seguridad. El home indicator de
+     cualquier iPhone real mide ~34px de alto, así que 40px sobra de sobra —
+     si algún dispositivo/instalación reportara un valor exagerado para
+     env(safe-area-inset-bottom) (no podemos verificarlo desde acá, ya que
+     Chromium en las pruebas siempre da 0), este tope evita que ese valor
+     "inflacione" el alto de la barra sin límite, que es exactamente el
+     síntoma reportado ("se ve muy alta la barra"). */
+  padding: 8px 4px calc(8px + min(env(safe-area-inset-bottom), 40px));
   z-index:30;
   transform:translateY(0);
   opacity:1;
   transition: transform .22s ease, opacity .18s ease;
+}
+/* Respaldo puramente visual: pinta con el mismo blanco/tarjeta de la barra
+   cualquier franja que pudiera quedar expuesta justo debajo de ella (por
+   ejemplo si el navegador calculara mal el área segura inferior en algún
+   modelo/versión de iOS puntual) — así, en el peor de los casos, se ve como
+   una barra blanca un poco más alta en vez de una franja de un color ajeno
+   (gris/beige) "flotando" sin explicación. No debería notarse en un
+   dispositivo donde todo mide bien, porque queda tapado por el propio
+   home indicator del sistema. */
+nav.tabbar::after{
+  content:'';
+  position:absolute;
+  left:0; right:0;
+  top:100%;
+  height:40px;
+  background:inherit;
 }
 nav.tabbar.tabbar-hidden{
   transform:translateY(100%);
@@ -1588,7 +1611,7 @@ main.no-pad{ padding:0; }
 /* Mismo ajuste que en main{} de más arriba, y por la misma razón (esta
    lista tiene su propio scroll propio con overflow-y, no usa el padding de
    main). */
-.messages-list-pad{ padding:12px 16px var(--navbar-h, calc(90px + env(safe-area-inset-bottom))); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
+.messages-list-pad{ padding:12px 16px var(--navbar-h, calc(90px + min(env(safe-area-inset-bottom), 40px))); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
 main.main-tabbar-hidden .messages-list-pad{ padding-bottom: 4px; }
 .conversation-row{
   width:100%;
@@ -2670,6 +2693,16 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
     justify-content:center;
     gap:8px;
     padding:10px 16px;
+  }
+  /* El ::after "relleno" de abajo (ver sección "Bottom nav") es sólo para
+     el modo celular, donde el nav es position:fixed y pegado al borde real
+     de la pantalla. En escritorio el nav vuelve a ser position:static (una
+     barra más, arriba, en el flujo normal) — sin apagar este pseudo-elemento
+     acá, quedaría con position:absolute apuntando a algún ancestro con
+     posición (como .phone), mostrando un rectángulo blanco de 40px suelto
+     en cualquier parte de la página de escritorio. */
+  nav.tabbar::after{
+    display:none;
   }
   /* En escritorio el nav es una barra de arriba en el flujo normal, no una
      barra flotante de abajo — el efecto de esconder al scrollear es sólo
