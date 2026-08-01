@@ -3,6 +3,7 @@ import { api } from './api';
 import PetAvatar from './PetAvatar';
 import FollowListModal from './FollowListModal';
 import ReportModal from './ReportModal';
+import PetPostsGrid from './PetPostsGrid';
 import { IconComment, IconAddUser, IconCheck, IconFlag, IconBlock } from './Icons';
 
 export default function PetProfileView({ petId, onBack, showToast, onMessagePet, onViewPet }) {
@@ -91,6 +92,9 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
           </div>
         )}
       </div>
+      {pet.cover_url && (
+        <div className="profile-cover profile-cover-readonly" style={{ backgroundImage: `url(${pet.cover_url})` }} />
+      )}
       <div className="profile-hero">
         <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} size={84} className="profile-avatar" />
         <div className="profile-name">{pet.name}</div>
@@ -137,6 +141,9 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
       </div>
       <div className="section-title">Sobre {pet.name}</div>
       <div className="bio-box">{pet.bio || 'Todavía no hay una biografía para esta mascota.'}</div>
+
+      <div className="section-title">Publicaciones</div>
+      <PetPostsGrid petId={petId} onViewPet={onViewPet} showToast={showToast} />
 
       {listModal && (
         <FollowListModal

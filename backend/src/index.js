@@ -476,7 +476,11 @@ app.get('/api/me', requireAuth, (req, res) => {
 
   res.json({
     user,
-    pet: { ...pet, photo_url: absoluteUploadUrl(req, pet.photo_path) },
+    pet: {
+      ...pet,
+      photo_url: absoluteUploadUrl(req, pet.photo_path),
+      cover_url: absoluteUploadUrl(req, pet.cover_path)
+    },
     stats: {
       posts: postsCount,
       playdates: playdatesCount,
@@ -500,6 +504,24 @@ app.patch('/api/pets/me/photo', requireAuth, (req, res, next) => {
   db.prepare('UPDATE pets SET photo_path = ? WHERE id = ?').run(req.file.filename, pet.id);
 
   res.json({ photo_url: absoluteUploadUrl(req, req.file.filename) });
+});
+
+// Foto de portada del perfil (estilo Facebook) — misma mecánica que la foto
+// de perfil (/api/pets/me/photo), pero guarda en la columna cover_path y se
+// recorta 16:9 en el cliente (ver ImageCropper en ProfileView).
+app.patch('/api/pets/me/cover', requireAuth, (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: uploadErrorMessage(err, IMAGE_MAX_MB) });
+    next();
+  });
+}, (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+  const pet = getPetByOwner(req.userId);
+  if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+
+  db.prepare('UPDATE pets SET cover_path = ? WHERE id = ?').run(req.file.filename, pet.id);
+
+  res.json({ cover_url: absoluteUploadUrl(req, req.file.filename) });
 });
 
 // Guarda la ubicación real del dispositivo (o la reemplaza si la persona la
@@ -549,6 +571,7 @@ app.delete('/api/me', requireAuth, (req, res) => {
   const filePaths = [];
   if (pet) {
     if (pet.photo_path) filePaths.push(pet.photo_path);
+    if (pet.cover_path) filePaths.push(pet.cover_path);
     db.prepare('SELECT image_path, video_path FROM posts WHERE pet_id = ?').all(pet.id)
       .forEach((p) => { if (p.image_path) filePaths.push(p.image_path); if (p.video_path) filePaths.push(p.video_path); });
     db.prepare('SELECT media_path, music_path FROM stories WHERE pet_id = ?').all(pet.id)
@@ -663,7 +686,11 @@ app.get('/api/pets/:id', requireAuth, (req, res) => {
   }
 
   res.json({
-    pet: { ...pet, photo_url: absoluteUploadUrl(req, pet.photo_path) },
+    pet: {
+      ...pet,
+      photo_url: absoluteUploadUrl(req, pet.photo_path),
+      cover_url: absoluteUploadUrl(req, pet.cover_path)
+    },
     owner_name: pet.owner_name,
     is_me: !!myPet && myPet.id === pet.id,
     distance_km: distanceKm,
@@ -672,6 +699,51 @@ app.get('/api/pets/:id', requireAuth, (req, res) => {
     is_blocked: myPet && myPet.id !== pet.id ? arePetsBlocked(myPet.id, pet.id) : false,
     stats: { posts: postsCount, followers: followerCount(pet.id), following: followingCount(pet.id) }
   });
+});
+
+// Todas las publicaciones de una mascota (para la grilla "Publicaciones" del
+// perfil — antes sólo se veía el número en las estadísticas, sin forma de
+// abrirlas). Misma forma de fila que /api/feed, filtrada por pet_id, para
+// poder reusar el mismo renderizado de foto+caption+etiquetas en el cliente.
+app.get('/api/pets/:id/posts', requireAuth, (req, res) => {
+  const petId = Number(req.params.id);
+  const myPet = getPetByOwner(req.userId);
+  if (myPet && arePetsBlocked(myPet.id, petId)) {
+    return res.status(403).json({ error: 'No podés ver las publicaciones de esta mascota' });
+  }
+  const rows = db
+    .prepare(
+      `SELECT posts.id, posts.caption, posts.media, posts.image_path, posts.comments_disabled, posts.created_at,
+              posts.shared_post_id,
+              pets.id AS pet_id, pets.owner_id, pets.name AS pet_name, pets.species, pets.breed, pets.color, pets.photo_path,
+              (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) AS likes_count,
+              (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) AS comments_count,
+              EXISTS(SELECT 1 FROM likes WHERE likes.post_id = posts.id AND likes.user_id = ?) AS liked_by_me,
+              orig.caption AS shared_caption, orig.image_path AS shared_image_path,
+              origpet.name AS shared_pet_name, origpet.species AS shared_species, origpet.color AS shared_color
+       FROM posts
+       JOIN pets ON pets.id = posts.pet_id
+       LEFT JOIN posts orig ON orig.id = posts.shared_post_id
+       LEFT JOIN pets origpet ON origpet.id = orig.pet_id
+       WHERE posts.post_type = 'post' AND posts.pet_id = ?
+       ORDER BY posts.created_at DESC, posts.id DESC`
+    )
+    .all(req.userId, petId);
+
+  const tagMap = tagsFor('post', rows.map((r) => r.id));
+
+  res.json(
+    rows.map((r) => ({
+      ...r,
+      liked_by_me: !!r.liked_by_me,
+      comments_disabled: !!r.comments_disabled,
+      is_mine: r.owner_id === req.userId,
+      image_url: absoluteUploadUrl(req, r.image_path),
+      pet_photo_url: absoluteUploadUrl(req, r.photo_path),
+      shared_image_url: absoluteUploadUrl(req, r.shared_image_path),
+      tagged_pets: taggedPetsFor(req, tagMap, r.id)
+    }))
+  );
 });
 
 // ---------- SEGUIDORES ----------

@@ -50,6 +50,49 @@
     --shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
 }
+/* Modo oscuro/claro elegido A MANO desde el menú de tres líneas ("Modo
+   oscuro" → Auto/Claro/Oscuro, ver SideMenu.jsx) — le gana al @media de
+   arriba (que sólo mira la preferencia del sistema) porque una regla con
+   clase (:root.force-dark) tiene más especificidad que una con sólo el
+   selector de elemento (:root) aunque esa segunda esté adentro de un
+   @media. "Auto" no agrega ninguna clase, así que en ese caso manda de
+   nuevo el @media (la preferencia del sistema), como fue siempre. */
+:root.force-dark{
+  --bg: #16181b;
+  --card: #202329;
+  --ink: #eceef1;
+  --ink-soft: #9aa0aa;
+  --line: #33373f;
+  --brand: #8b95a0;
+  --brand-soft: #33373f;
+  --accent: #6b7680;
+  --accent-soft: #262a2f;
+  --input-bg: #24272c;
+  --chip-bg: #282b31;
+  --surface-alt: #1d2024;
+  --danger: #e2795f;
+  --danger-soft: #3a2620;
+  --page-bg: #0d0e10;
+  --shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+:root.force-light{
+  --bg: #eceef1;
+  --card: #ffffff;
+  --ink: #24262b;
+  --ink-soft: #6b6f78;
+  --line: #d8dbdf;
+  --brand: #6b737c;
+  --brand-soft: #e6e8eb;
+  --accent: #4f5b66;
+  --accent-soft: #e1e5e8;
+  --input-bg: #ffffff;
+  --chip-bg: #eceef1;
+  --surface-alt: #f4f5f7;
+  --danger: #a3402a;
+  --danger-soft: #fbe9e4;
+  --page-bg: #cbd0d5;
+  --shadow: 0 8px 24px rgba(30,34,40,0.12);
+}
 *{box-sizing:border-box;}
 /* Sin esto, iOS Safari (y el Chromium de las pruebas) muestran un flash
    gris/negro semitransparente encima de cualquier botón al tocarlo (el

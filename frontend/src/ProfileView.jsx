@@ -7,6 +7,7 @@ import ErrorBoundary from './ErrorBoundary';
 import FollowListModal from './FollowListModal';
 import SettingsModal from './SettingsModal';
 import EditProfileModal from './EditProfileModal';
+import PetPostsGrid from './PetPostsGrid';
 import { IconCamera, IconSettings } from './Icons';
 
 export default function ProfileView({ onLogout, showToast, onViewPet }) {
@@ -14,6 +15,9 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverCropFile, setCoverCropFile] = useState(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [listModal, setListModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -50,12 +54,47 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
     }
   }
 
+  function handleCoverPick(file) {
+    setCoverPickerOpen(false);
+    if (!file.type.startsWith('image/')) {
+      showToast('Ese archivo no es una imagen');
+      return;
+    }
+    setCoverCropFile(file);
+  }
+
+  async function handleCoverCropConfirm(croppedFile) {
+    setCoverCropFile(null);
+    setCoverUploading(true);
+    try {
+      const result = await api.uploadPetCover(croppedFile);
+      setMe((prev) => ({ ...prev, pet: { ...prev.pet, cover_url: result.cover_url } }));
+      showToast('¡Foto de portada actualizada!');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setCoverUploading(false);
+    }
+  }
+
   if (!me) return <div className="section-title">Cargando perfil…</div>;
 
   const { user, pet, stats } = me;
 
   return (
     <section>
+      <div className="profile-cover" style={pet.cover_url ? { backgroundImage: `url(${pet.cover_url})` } : undefined}>
+        <button
+          type="button"
+          className="profile-cover-btn"
+          title="Cambiar foto de portada"
+          aria-label="Cambiar foto de portada"
+          onClick={() => setCoverPickerOpen(true)}
+          disabled={coverUploading}
+        >
+          {coverUploading ? '…' : <><IconCamera size={14} /> {pet.cover_url ? 'Cambiar portada' : 'Agregar portada'}</>}
+        </button>
+      </div>
       <div className="profile-hero">
         <button
           type="button"
@@ -96,6 +135,9 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
       <button className="logout-btn" onClick={() => setEditOpen(true)}>Editar perfil</button>
       <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
 
+      <div className="section-title">Publicaciones</div>
+      <PetPostsGrid petId={pet.id} onViewPet={onViewPet} showToast={showToast} />
+
       {pickerOpen && (
         <MediaPickerModal
           destination="profile"
@@ -115,6 +157,28 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
             title="Acomodá tu foto de perfil"
             onConfirm={handleCropConfirm}
             onCancel={() => setCropFile(null)}
+          />
+        </ErrorBoundary>
+      )}
+
+      {coverPickerOpen && (
+        <MediaPickerModal
+          destination="cover"
+          allowedDestinations={['cover']}
+          onSelect={handleCoverPick}
+          onClose={() => setCoverPickerOpen(false)}
+          showToast={showToast}
+        />
+      )}
+
+      {coverCropFile && (
+        <ErrorBoundary onReset={() => setCoverCropFile(null)} label="profile-cover-cropper">
+          <ImageCropper
+            file={coverCropFile}
+            aspect={16 / 9}
+            title="Acomodá tu foto de portada"
+            onConfirm={handleCoverCropConfirm}
+            onCancel={() => setCoverCropFile(null)}
           />
         </ErrorBoundary>
       )}

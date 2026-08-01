@@ -41,6 +41,18 @@ header.appbar{
   z-index:5;
   border-bottom:1px solid var(--line);
 }
+/* Agrupa el botón de menú hamburguesa junto al logo/buscador para que los
+   dos convivan como un solo bloque a la izquierda del header (el otro
+   bloque es .appbar-actions, a la derecha) — mismo truco que ya se usaba en
+   .appbar-actions para juntar el +/lupa/mensajes. */
+.appbar-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1;
+  min-width:0;
+}
+.hamburger-btn{ flex-shrink:0; }
 .logo{
   font-size:20px;
   font-weight:700;
@@ -124,7 +136,14 @@ header.appbar{
 }
 .header-plus-dropdown button:hover{ background:var(--chip-bg); }
 .header-plus-dropdown button + button{ border-top:1px solid var(--line); }
-button.icon-btn{ padding:0; margin-left:8px; }
+/* Antes esto tenía además margin-left:8px, que se sumaba al gap:8px que ya
+   pone .appbar-actions entre CADA ícono — pero esa regla sólo aplica a
+   elementos <button> (el ícono de mensajes lo es; el "+" y la lupa antes
+   eran <div>), así que el hueco antes de "mensajes" terminaba siendo el
+   doble (16px) que el resto (8px), una separación pareja. Sacando el
+   margin-left y dejando sólo el gap del contenedor, los tres huecos quedan
+   iguales. */
+button.icon-btn{ padding:0; }
 .icon-btn .header-badge{
   position:absolute;
   top:-4px;
@@ -138,7 +157,18 @@ main{
   min-height:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
-  padding: 12px 16px 90px;
+  /* Antes esto era un 90px fijo, calculado para alcanzar SÓLO en el
+     navegador (donde env(safe-area-inset-bottom) vale 0). nav.tabbar de
+     abajo sí suma ese valor a su propio padding (ver más abajo), así que
+     cuando la app corre instalada como PWA en un iPhone con muesca/Face ID
+     (donde esa franja segura es real, ~34px) la barra de navegación crece
+     esos 34px pero el hueco que le reservábamos acá abajo no — el resultado
+     es que la barra termina tapando esos últimos ~34px del feed, que es
+     justo el bug de "la barra de abajo tapa contenido, pero sólo en la app
+     anclada a inicio" que se reportó varias veces (en el navegador, con esa
+     franja en 0, nunca se notaba). Sumando el mismo env(...) acá, el hueco
+     reservado crece exactamente lo mismo que crece la barra real. */
+  padding: 12px 16px calc(90px + env(safe-area-inset-bottom));
   text-align:left;
   width:100%;
 }
@@ -908,6 +938,39 @@ main{
 }
 
 /* Profile view */
+/* Foto de portada estilo Facebook — un rectángulo grande arriba de la
+   tarjeta de perfil. Si todavía no hay ninguna (cover_url vacío) se ve un
+   fondo liso con el botón para agregar una encima; una vez que hay foto, el
+   mismo botón cambia a "Cambiar portada". En el perfil de OTRAS mascotas
+   (PetProfileView) no se agrega el botón — ver .profile-cover-readonly. */
+.profile-cover{
+  position:relative;
+  height:140px;
+  border-radius:var(--radius);
+  background:var(--brand-soft) center/cover no-repeat;
+  border:1px solid var(--line);
+  margin-bottom:16px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+}
+.profile-cover-readonly{ margin-bottom:16px; }
+.profile-cover-btn{
+  margin:10px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 12px;
+  border-radius:999px;
+  background:rgba(20,22,26,0.55);
+  color:#fff;
+  border:none;
+  font-family:inherit;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.profile-cover-btn:disabled{ opacity:0.7; }
 .profile-hero{
   position:relative;
   background:var(--card);
@@ -1016,6 +1079,74 @@ main{
   font-size:13.5px;
   color:var(--ink);
   line-height:1.5;
+}
+
+/* Grilla de publicaciones del perfil (estilo Instagram: 3 columnas, cuadrada,
+   tocar abre el detalle en un modal). Antes las publicaciones de un perfil
+   sólo se veían como número en las estadísticas, sin forma de repasarlas. */
+.pet-posts-grid{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:3px;
+  margin-top:10px;
+}
+.pet-posts-grid-item{
+  position:relative;
+  aspect-ratio:1;
+  padding:0;
+  border:none;
+  border-radius:6px;
+  overflow:hidden;
+  cursor:pointer;
+  background:var(--surface-alt);
+}
+.pet-posts-grid-item img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.pet-posts-grid-textonly{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:6px;
+  font-size:11px;
+  color:#fff;
+  text-align:center;
+  overflow:hidden;
+}
+.pet-post-lightbox{
+  max-width:420px;
+  width:100%;
+}
+.pet-post-lightbox-photo{
+  width:100%;
+  max-height:60vh;
+  object-fit:contain;
+  border-radius:12px;
+  background:var(--surface-alt);
+  margin-top:8px;
+}
+.pet-post-lightbox-caption{
+  margin-top:10px;
+  font-size:13.5px;
+  color:var(--ink);
+  line-height:1.5;
+}
+.pet-post-lightbox-stats{
+  display:flex;
+  gap:16px;
+  margin-top:12px;
+  color:var(--ink-soft);
+  font-size:13px;
+}
+.pet-post-lightbox-stats span{
+  display:flex;
+  align-items:center;
+  gap:5px;
 }
 .logout-btn{
   width:100%;
@@ -1370,7 +1501,10 @@ main.no-pad{ padding:0; }
 .story-tap-zone.right{ right:0; }
 
 /* ---------- Mensajes ---------- */
-.messages-list-pad{ padding:12px 16px 90px; height:100%; overflow-y:auto; }
+/* Mismo ajuste que en main{} de más arriba, y por la misma razón (esta
+   lista tiene su propio scroll propio con overflow-y, no usa el padding de
+   main). */
+.messages-list-pad{ padding:12px 16px calc(90px + env(safe-area-inset-bottom)); height:100%; overflow-y:auto; }
 .conversation-row{
   width:100%;
   display:flex;
@@ -1536,6 +1670,95 @@ main.no-pad{ padding:0; }
   align-items:center;
   padding:0;
 }
+/* ---------- Menú lateral (hamburguesa del header) ---------- */
+/* A diferencia de los demás modales (que .modal-backdrop centra en el medio
+   de la pantalla), este se abre como un panel pegado al borde izquierdo —
+   por eso .side-menu-card usa position:fixed propio (que ignora el
+   centrado en flex del backdrop) en vez del .modal-card genérico. */
+.side-menu-backdrop{ justify-content:flex-start; padding:0; }
+.side-menu-card{
+  position:fixed;
+  top:0; left:0; bottom:0;
+  width:80%;
+  max-width:300px;
+  background:var(--card);
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+  padding: calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));
+  overflow-y:auto;
+  animation: side-menu-in 0.16s ease-out;
+}
+@keyframes side-menu-in{
+  from{ transform:translateX(-100%); }
+  to{ transform:translateX(0); }
+}
+.side-menu-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:18px;
+}
+.side-menu-pet-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  text-align:left;
+  font-family:inherit;
+}
+.side-menu-pet-name{ font-size:15px; font-weight:800; color:var(--ink); }
+.side-menu-pet-sub{ font-size:12px; color:var(--ink-soft); }
+.side-menu-section{
+  padding:6px 0;
+  border-top:1px solid var(--line);
+}
+.side-menu-section:first-of-type{ border-top:none; }
+.side-menu-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:12px 4px;
+  background:none;
+  border:none;
+  font-family:inherit;
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--ink);
+  cursor:pointer;
+  text-align:left;
+  text-decoration:none;
+}
+.side-menu-row:disabled{ opacity:0.6; cursor:not-allowed; }
+.side-menu-chevron{ margin-left:auto; color:var(--ink-soft); }
+.side-menu-danger{ color:var(--danger); }
+.side-menu-theme-row{ flex-wrap:wrap; cursor:default; }
+.side-menu-theme-options{
+  display:flex;
+  gap:6px;
+  margin-left:auto;
+}
+.side-menu-theme-options button{
+  padding:5px 10px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--surface-alt);
+  color:var(--ink-soft);
+  font-family:inherit;
+  font-size:11.5px;
+  font-weight:700;
+  cursor:pointer;
+}
+.side-menu-theme-options button.active{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+}
+
 .follow-list-card{ max-height:70vh; display:flex; flex-direction:column; }
 .follow-list{ overflow-y:auto; }
 .follow-list-row{

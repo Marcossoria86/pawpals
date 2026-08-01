@@ -184,6 +184,9 @@ ensureColumn('comments', 'edited_at', 'TEXT');
 // reutilizan la columna post_id que ya existía, pero una historia no tiene
 // post_id, así que necesita la suya propia.
 ensureColumn('notifications', 'story_id', 'INTEGER');
+// Foto de portada del perfil (estilo Facebook), separada de la foto de
+// perfil (photo_path) — se ve como fondo grande arriba del avatar.
+ensureColumn('pets', 'cover_path', 'TEXT');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

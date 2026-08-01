@@ -33,9 +33,14 @@ export function IconReels() {
   );
 }
 
-export function IconRequests() {
+// El ícono de "Solicitudes" (citas de juego) es una huella chiquita hecha de
+// varias formas finitas — al lado de los otros íconos de la barra (que son
+// un solo trazo grueso) se veía notablemente más chico aunque comparta el
+// mismo width/height base. Con size={30} en vez de heredar el 25 por
+// defecto de COMMON queda parejo a simple vista con sus vecinos.
+export function IconRequests({ size } = {}) {
   return (
-    <svg {...COMMON} aria-hidden="true">
+    <svg {...COMMON} {...(size ? { width: size, height: size } : {})} aria-hidden="true">
       <circle cx="8.3" cy="8" r="1.7" />
       <circle cx="12" cy="6.3" r="1.7" />
       <circle cx="15.7" cy="8" r="1.7" />

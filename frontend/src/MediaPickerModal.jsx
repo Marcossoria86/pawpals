@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { IconClose, IconChevronRight, IconCamera, IconGallery, IconCheck, IconPlayPause } from './Icons';
 
 const DEST_LABELS = { post: 'PUBLICACIÓN', story: 'HISTORIA', reel: 'REEL' };
-const DEST_TITLES = { post: 'Nueva publicación', story: 'Nueva historia', reel: 'Nuevo reel', profile: 'Foto de perfil' };
+const DEST_TITLES = { post: 'Nueva publicación', story: 'Nueva historia', reel: 'Nuevo reel', profile: 'Foto de perfil', cover: 'Foto de portada' };
 
 function acceptFor(dest) {
   if (dest === 'reel') return 'video/*';

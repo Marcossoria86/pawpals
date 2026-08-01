@@ -87,11 +87,17 @@ export const api = {
   nearby: () => request('/api/nearby'),
   requestPlaydate: (targetPetId) => request('/api/playdates', { method: 'POST', body: JSON.stringify({ targetPetId }) }),
   pet: (petId) => request(`/api/pets/${petId}`),
+  petPosts: (petId) => request(`/api/pets/${petId}/posts`),
   updatePetProfile: (payload) => request('/api/pets/me/profile', { method: 'PATCH', body: JSON.stringify(payload) }),
   uploadPetPhoto: (photoFile) => {
     const form = new FormData();
     form.append('photo', photoFile);
     return request('/api/pets/me/photo', { method: 'PATCH', body: form });
+  },
+  uploadPetCover: (photoFile) => {
+    const form = new FormData();
+    form.append('photo', photoFile);
+    return request('/api/pets/me/cover', { method: 'PATCH', body: form });
   },
   sharePost: (postId, caption) => request(`/api/posts/${postId}/share`, { method: 'POST', body: JSON.stringify({ caption }) }),
 

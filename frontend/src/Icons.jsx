@@ -287,3 +287,44 @@ export function IconPawSmall({ size = 22 }) {
     </svg>
   );
 }
+
+// Menú hamburguesa (tres líneas) — abre el panel lateral de opciones
+// (Configuración y privacidad, modo oscuro, ayuda, cerrar sesión), al
+// estilo del menú que se abre desde el ícono de tres líneas de Facebook.
+export function IconMenu({ size = 22 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M4 6.5h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17.5h16" />
+    </svg>
+  );
+}
+
+export function IconMoon({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M20 13.8A8.2 8.2 0 1 1 10.2 4a6.4 6.4 0 0 0 9.8 9.8Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconHelp({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M9.6 9.4a2.4 2.4 0 1 1 3.5 2.1c-.75.45-1.1.9-1.1 1.7v.3" />
+      <circle cx="12" cy="16.6" r="0.15" fill="currentColor" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+export function IconLogout({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4H9" />
+      <path d="M15.5 16 20 12l-4.5-4" />
+      <path d="M20 12H9" />
+    </svg>
+  );
+}

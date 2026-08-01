@@ -16,21 +16,41 @@ import MessagesView from './MessagesView';
 import NewPostComposer from './NewPostComposer';
 import MediaPickerModal from './MediaPickerModal';
 import CrossPostFlow from './CrossPostFlow';
+import SideMenu from './SideMenu';
 import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
-import { IconSearch, IconClose, IconPawPair, IconPlus, IconGallery, IconCamera } from './Icons';
+import { IconSearch, IconClose, IconPawPair, IconPlus, IconGallery, IconCamera, IconMenu } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
 // pendientes de aceptar/rechazar), Cerca de ti (ocupa el lugar que en
 // Facebook sería Marketplace), Notificaciones y Mi perfil. Los íconos son
 // dibujos propios (NavIcons.jsx), no emojis.
+//
+// El ícono de "Solicitudes" (una huella hecha de varias formas finitas) se
+// ve más chico que sus vecinos (un solo trazo grueso) aunque compartan el
+// mismo tamaño base — por eso acá se lo agranda un poco a mano (30 en vez
+// de 25) para que se vea parejo con el resto a simple vista.
 const TABS = [
   { key: 'feed', label: 'Feed', icon: <IconHome /> },
   { key: 'reels', label: 'Reels', icon: <IconReels /> },
-  { key: 'requests', label: 'Solicitudes', icon: <IconRequests /> },
+  { key: 'requests', label: 'Solicitudes', icon: <IconRequests size={30} /> },
   { key: 'nearby', label: 'Cerca de ti', icon: <IconNearby /> },
   { key: 'notifications', label: 'Notificaciones', icon: <IconBell /> },
   { key: 'profile', label: 'Mi perfil', icon: <IconProfile /> }
 ];
+
+// Tema claro/oscuro/automático (ver SideMenu → "Modo oscuro"). Por defecto
+// sigue la preferencia del sistema operativo (ver el @media de index.css);
+// si la persona elige "Claro" u "Oscuro" a mano, se guarda en localStorage y
+// se fuerza con una clase en <html> que le gana al @media (ver index.css:
+// :root.force-light / :root.force-dark, ambas con más especificidad que la
+// regla del @media).
+const THEME_KEY = 'pawpals-theme';
+function applyTheme(theme) {
+  document.documentElement.classList.remove('force-light', 'force-dark');
+  if (theme === 'light' || theme === 'dark') {
+    document.documentElement.classList.add(`force-${theme}`);
+  }
+}
 
 function App() {
   // El enlace del mail de "recuperar contraseña" apunta acá con
@@ -67,6 +87,11 @@ function App() {
   const [plusPostOpen, setPlusPostOpen] = useState(false);
   const [plusPickerDest, setPlusPickerDest] = useState(null); // 'story' | 'reel'
   const [plusCrossPost, setPlusCrossPost] = useState(null); // { kind, file }
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem(THEME_KEY);
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  });
   const mainRef = useRef(null);
   const navRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -164,6 +189,17 @@ function App() {
     });
   }
 
+  useEffect(() => { applyTheme(theme); }, [theme]);
+
+  function handleThemeChange(next) {
+    setTheme(next);
+    if (next === 'system') {
+      localStorage.removeItem(THEME_KEY);
+    } else {
+      localStorage.setItem(THEME_KEY, next);
+    }
+  }
+
   const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2200);
@@ -240,22 +276,35 @@ function App() {
   return (
     <div className="phone">
       <header className="appbar">
-        {searchOpen ? (
-          <input
-            autoFocus
-            className="search-input"
-            type="text"
-            placeholder={tab === 'nearby' ? 'Buscar por nombre, raza o dueño…' : 'Buscar en el feed…'}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        ) : (
-          <button type="button" className="logo logo-btn" onClick={goHome} title="Ir al inicio">
-            <IconPawPair size={26} /> PawPals
-          </button>
-        )}
-        <div className="appbar-actions">
+        <div className="appbar-left">
           {!searchOpen && (
+            <button type="button" className="icon-btn hamburger-btn" onClick={() => setSideMenuOpen(true)} title="Menú" aria-label="Menú">
+              <IconMenu size={20} />
+            </button>
+          )}
+          {searchOpen ? (
+            <input
+              autoFocus
+              className="search-input"
+              type="text"
+              placeholder={tab === 'nearby' ? 'Buscar por nombre, raza o dueño…' : 'Buscar en el feed…'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          ) : (
+            <button type="button" className="logo logo-btn" onClick={goHome} title="Ir al inicio">
+              <IconPawPair size={34} /> PawPals
+            </button>
+          )}
+        </div>
+        <div className="appbar-actions">
+          {/* El "+" (nueva publicación/historia/reel) no tiene sentido dentro
+              de la bandeja de Mensajes — además, ahí el menú desplegable
+              (que se abre hacia la izquierda desde este botón) quedaba fuera
+              de la pantalla porque en esa pestaña es el único ícono visible,
+              pegado contra el borde derecho. Por eso se esconde en esta
+              pestaña. */}
+          {!searchOpen && tab !== 'messages' && (
             <div className="header-plus-wrap">
               <button
                 type="button"
@@ -292,6 +341,17 @@ function App() {
           )}
         </div>
       </header>
+
+      {sideMenuOpen && (
+        <SideMenu
+          onClose={() => setSideMenuOpen(false)}
+          onLogout={() => { setSideMenuOpen(false); setAuthenticated(false); }}
+          onViewProfile={() => { setSideMenuOpen(false); selectTab('profile'); }}
+          showToast={showToast}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+        />
+      )}
 
       <main
         ref={mainRef}
