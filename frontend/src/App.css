@@ -180,6 +180,15 @@ main{
   min-height:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  /* Sin esto, el navegador puede "compensar" solo el scroll cuando algo
+     cambia de tamaño dentro de <main> (una imagen que termina de cargar,
+     o el propio padding de abajo achicándose al esconder la barra — ver
+     el comentario de lastToggleAtRef en App.jsx) reacomodando scrollTop
+     por su cuenta. Eso genera eventos de scroll falsos que pueden
+     confundirse con un gesto real del usuario y disparar el parpadeo de
+     la barra. No tiene soporte en todos los navegadores, pero no hace
+     nada si no lo soporta — sólo suma, nunca resta. */
+  overflow-anchor:none;
   /* Este hueco de abajo existe SÓLO para que la barra de navegación fija no
      tape el último post cuando está visible — por eso su tamaño tiene que
      coincidir EXACTO con el alto real de esa barra. Antes era un número
@@ -199,7 +208,28 @@ main{
      de la pantalla, sin ninguna franja — es lo que se pidió
      explícitamente. */
   padding: 12px 16px var(--navbar-h, calc(63px + min(env(safe-area-inset-bottom), 40px)));
-  transition: padding-bottom .22s ease;
+  /* ACÁ estaba el verdadero problema, encontrado recién analizando el video
+     que mandó el usuario cuadro por cuadro: esta franja gris no era un
+     desajuste de tamaño fijo — aparecía y desaparecía SOLA mientras se
+     scrolleaba, exactamente durante el ratito en que la barra se esconde o
+     aparece. Causa: este padding-bottom animaba con su propia transición
+     (.22s) EN PARALELO a la del nav (transform .22s + opacity .18s, dos
+     valores distintos) — dos animaciones independientes, en dos elementos
+     distintos, sin ninguna garantía de terminar el mismo cuadro exacto. En
+     una compu de escritorio (donde se probó todo hasta ahora) van siempre a
+     60fps perfectos y por eso nunca se notaba un desfasaje — pero en el
+     celular, con la app haciendo más cosas a la vez, se desincronizan lo
+     suficiente como para que se vea, durante esos ~200ms, un hueco sin
+     tapar entre lo que el nav ya dejó de cubrir y lo que <main> todavía no
+     terminó de ocupar (o viceversa).
+     Arreglo: en vez de animar este padding en paralelo, lo hacemos
+     "esperar" a que el nav ya haya terminado de aparecer (transition-delay
+     de .22s, mismo tiempo que tarda el nav en deslizarse a su lugar) antes
+     de agrandarse — así el nav ya está ahí, tapando, cuando este padding
+     recién cambia. Ver main.main-tabbar-hidden más abajo para el caso
+     contrario (esconder), que necesita la lógica inversa: cambiar
+     ENSEGUIDA, no después. */
+  transition: padding-bottom 0s linear .22s;
   text-align:left;
   width:100%;
 }
@@ -216,6 +246,15 @@ main:not(.no-pad).main-tabbar-hidden{
      no hay nada que ese margen deba esquivar (así se ve Instagram/Facebook
      también — el contenido llega hasta el borde real). */
   padding-bottom: 4px;
+  /* Achicarse pasa a ser SIN retraso (al revés que la regla de arriba):
+     achicar el padding ENSEGUIDA, mientras el nav (todavía opaco, recién
+     empezando a deslizarse/desvanecerse) sigue tapando esa franja durante
+     TODA su propia animación — así, para cuando el nav termina de
+     desaparecer, el contenido ya está ahí abajo esperando, sin que se
+     note el cambio. Si este achique también esperara .22s como el de
+     arriba, se vería el hueco vacío recién aparecer justo cuando el nav
+     ya se fue. */
+  transition: padding-bottom 0s linear 0s;
 }
 
 
@@ -1615,8 +1654,12 @@ main.no-pad{ padding:0; }
 /* Mismo ajuste que en main{} de más arriba, y por la misma razón (esta
    lista tiene su propio scroll propio con overflow-y, no usa el padding de
    main). */
-.messages-list-pad{ padding:12px 16px var(--navbar-h, calc(63px + min(env(safe-area-inset-bottom), 40px))); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
-main.main-tabbar-hidden .messages-list-pad{ padding-bottom: 4px; }
+/* Mismo truco de transition-delay que en <main> (ver comentario largo ahí):
+   agrandarse espera a que el nav ya haya terminado de aparecer, para que
+   nunca quede un hueco sin tapar mientras las dos animaciones (nav y este
+   padding) corren en paralelo. */
+.messages-list-pad{ padding:12px 16px var(--navbar-h, calc(63px + min(env(safe-area-inset-bottom), 40px))); height:100%; overflow-y:auto; transition: padding-bottom 0s linear .22s; }
+main.main-tabbar-hidden .messages-list-pad{ padding-bottom: 4px; transition: padding-bottom 0s linear 0s; }
 .conversation-row{
   width:100%;
   display:flex;

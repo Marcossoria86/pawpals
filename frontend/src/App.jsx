@@ -166,18 +166,47 @@ function App() {
   // natural del scroll por inercia en el teléfono (que va y viene unos
   // pocos píxeles mientras frena) hace que la barra parpadee sola.
   const SCROLL_HIDE_THRESHOLD = 40;
+  // Encontré ESTO analizando un video que mandó el usuario, cuadro por
+  // cuadro: el padding de abajo de <main> se achica/agranda cuando la
+  // barra se esconde/aparece (para que el feed llegue hasta el borde) —
+  // pero achicar ese padding TAMBIÉN achica cuánto puede scrollear
+  // <main> (el padding cuenta para su alto scrolleable). El navegador
+  // puede reaccionar solo a ese cambio re-acomodando el scrollTop (scroll
+  // anchoring: si lo que estaba "anclado" visualmente se movió, lo
+  // compensa) — y ESE reacomodo genera un evento de scroll NATIVO, de
+  // verdad, sin que el usuario haya tocado la pantalla. Si lo tratamos
+  // como si fuera scroll real, el delta puede cruzar el umbral en la
+  // dirección CONTRARIA a la que recién decidimos, y listo: la barra
+  // vuelve a aparecer sola, en bucle — es el mismo problema que ya se
+  // había resuelto para el ALTO del nav (por eso es position:fixed, ver
+  // comentario de más arriba), pero ahora con el PADDING de <main>.
+  // lastToggleAtRef guarda cuándo fue el último cambio nuestro; cualquier
+  // evento de scroll que llegue muy pegado a ese instante (dentro de
+  // TOGGLE_COOLDOWN_MS) se ignora para decidir mostrar/esconder — es
+  // eco, no un gesto nuevo del usuario. Sí actualizamos la posición de
+  // referencia igual, para no perder de vista dónde quedó el scroll de
+  // verdad.
+  const lastToggleAtRef = useRef(0);
+  const TOGGLE_COOLDOWN_MS = 160;
   function handleScrollCapture(e) {
     const top = e.target.scrollTop ?? 0;
+    if (Date.now() - lastToggleAtRef.current < TOGGLE_COOLDOWN_MS) {
+      lastScrollTopRef.current = top;
+      return;
+    }
     if (top < 24) {
+      if (tabbarHidden) lastToggleAtRef.current = Date.now();
       setTabbarHidden(false);
       lastScrollTopRef.current = top;
       return;
     }
     const delta = top - lastScrollTopRef.current;
     if (delta > SCROLL_HIDE_THRESHOLD) {
+      lastToggleAtRef.current = Date.now();
       setTabbarHidden(true);
       lastScrollTopRef.current = top;
     } else if (delta < -SCROLL_HIDE_THRESHOLD) {
+      lastToggleAtRef.current = Date.now();
       setTabbarHidden(false);
       lastScrollTopRef.current = top;
     }
