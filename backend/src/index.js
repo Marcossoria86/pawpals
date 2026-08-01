@@ -161,6 +161,11 @@ app.use(cors({
     // Pedidos sin "origin" (ej. apps nativas en algunos casos, o curl) los
     // dejamos pasar; si viene un origin, tiene que estar en la lista.
     if (!origin || CLIENT_ORIGINS.includes(origin)) return cb(null, true);
+    // Sin este log era imposible saber CUÁL origen rechazó (el error que
+    // llega al navegador no lo dice) — con esto, la próxima vez que pase,
+    // en los Logs de Render se ve exactamente qué URL quedó afuera de
+    // CLIENT_ORIGIN.
+    console.error('[CORS] Origen rechazado:', origin, '— permitidos:', CLIENT_ORIGINS.join(', '));
     cb(new Error('No permitido por CORS'));
   },
   credentials: true
@@ -189,12 +194,104 @@ function absoluteUploadUrl(req, imagePath) {
 
 // Crea una notificación, salvo que el destinatario sea la propia persona que
 // disparó la acción (nadie necesita que le avisen que le dio like a lo suyo).
-function notify(recipientUserId, actorUserId, actorPetId, type, { postId = null, playdateId = null } = {}) {
+function notify(recipientUserId, actorUserId, actorPetId, type, { postId = null, playdateId = null, storyId = null } = {}) {
   if (!recipientUserId || recipientUserId === actorUserId) return;
   db.prepare(
-    `INSERT INTO notifications (recipient_user_id, actor_pet_id, type, post_id, playdate_id)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(recipientUserId, actorPetId, type, postId, playdateId);
+    `INSERT INTO notifications (recipient_user_id, actor_pet_id, type, post_id, playdate_id, story_id)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(recipientUserId, actorPetId, type, postId, playdateId, storyId);
+}
+
+// ---------- ETIQUETAS DE MASCOTAS ----------
+// Se usan en publicaciones, comentarios e historias (ver pet_tags en db.js).
+// targetType es 'post' | 'comment' | 'story'.
+
+// Valida la lista de IDs de mascota que mandó el cliente para etiquetar:
+// tiene que ser JSON de números enteros positivos, sin duplicados y con un
+// tope razonable (nadie necesita etiquetar a más de 10 mascotas en una sola
+// publicación/comentario/historia).
+function sanitizeTaggedPetIds(raw) {
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const ids = parsed.map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0);
+  return Array.from(new Set(ids)).slice(0, 10);
+}
+
+// Guarda las etiquetas válidas (mascota existe, no es quien etiqueta, y no
+// está bloqueada con quien etiqueta) y devuelve la lista de mascotas
+// realmente etiquetadas — para poder mandarles la notificación después.
+function attachTags(targetType, targetId, petIds, taggerPetId) {
+  if (!petIds.length) return [];
+  const insert = db.prepare('INSERT INTO pet_tags (target_type, target_id, pet_id) VALUES (?, ?, ?)');
+  const tagged = [];
+  for (const petId of petIds) {
+    if (petId === taggerPetId) continue;
+    const pet = db
+      .prepare('SELECT id, owner_id, name AS pet_name, species, color, photo_path FROM pets WHERE id = ?')
+      .get(petId);
+    if (!pet) continue;
+    if (arePetsBlocked(taggerPetId, petId)) continue;
+    insert.run(targetType, targetId, petId);
+    tagged.push(pet);
+  }
+  return tagged;
+}
+
+// Formatea la lista que devuelve attachTags para mandarla directo en la
+// respuesta de "se creó" (publicación/comentario/historia) sin tener que
+// pedirle al cliente que recargue todo para ver los nombres de las
+// mascotas recién etiquetadas.
+function formatTagged(req, tagged) {
+  return tagged.map((t) => ({
+    pet_id: t.id,
+    pet_name: t.pet_name,
+    species: t.species,
+    color: t.color,
+    photo_url: absoluteUploadUrl(req, t.photo_path)
+  }));
+}
+
+// Trae las mascotas etiquetadas en varios targets a la vez (una publicación
+// por cada post del feed, por ejemplo) en una sola consulta, agrupadas por
+// target_id — así no hay que hacer una consulta por publicación.
+function tagsFor(targetType, targetIds) {
+  const map = new Map();
+  if (!targetIds.length) return map;
+  const placeholders = targetIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT pet_tags.target_id AS target_id, pets.id AS pet_id, pets.name AS pet_name,
+              pets.species, pets.color, pets.photo_path
+       FROM pet_tags
+       JOIN pets ON pets.id = pet_tags.pet_id
+       WHERE pet_tags.target_type = ? AND pet_tags.target_id IN (${placeholders})
+       ORDER BY pet_tags.id ASC`
+    )
+    .all(targetType, ...targetIds);
+  rows.forEach((r) => {
+    if (!map.has(r.target_id)) map.set(r.target_id, []);
+    map.get(r.target_id).push(r);
+  });
+  return map;
+}
+
+// Arma la lista final de mascotas etiquetadas para una respuesta de la API,
+// con la URL absoluta de su foto ya resuelta.
+function taggedPetsFor(req, map, targetId) {
+  const rows = map.get(targetId) || [];
+  return rows.map((r) => ({
+    pet_id: r.pet_id,
+    pet_name: r.pet_name,
+    species: r.species,
+    color: r.color,
+    photo_url: absoluteUploadUrl(req, r.photo_path)
+  }));
 }
 
 function ownerIdOfPet(petId) {
@@ -518,6 +615,29 @@ app.patch('/api/me/email', requireAuth, (req, res) => {
   res.json({ ok: true, email });
 });
 
+// Buscador de mascotas por nombre, para el selector de "etiquetar mascotas"
+// (posts, comentarios e historias). Va ANTES de /api/pets/:id a propósito:
+// Express matchea rutas en el orden en que se definen, y si esta quedara
+// después, "/api/pets/search" caería en el parámetro :id de la otra ruta.
+app.get('/api/pets/search', requireAuth, (req, res) => {
+  const q = (req.query.q || '').toString().trim();
+  if (!q) return res.json([]);
+  const myPet = getPetByOwner(req.userId);
+  const blocked = blockedPetIdsFor(myPet ? myPet.id : null);
+  const rows = db
+    .prepare(
+      `SELECT id AS pet_id, name AS pet_name, species, breed, color, photo_path
+       FROM pets
+       WHERE name LIKE ? COLLATE NOCASE
+       ORDER BY name ASC
+       LIMIT 20`
+    )
+    .all(`%${q}%`)
+    .filter((r) => !blocked.has(r.pet_id));
+
+  res.json(rows.map((r) => ({ ...r, photo_url: absoluteUploadUrl(req, r.photo_path) })));
+});
+
 app.get('/api/pets/:id', requireAuth, (req, res) => {
   const petId = Number(req.params.id);
   const pet = db
@@ -763,6 +883,8 @@ app.get('/api/feed', requireAuth, (req, res) => {
     // bloqueo es una tabla chica, filtrar en JS después alcanza de sobra).
     .filter((r) => !blocked.has(r.pet_id));
 
+  const tagMap = tagsFor('post', rows.map((r) => r.id));
+
   res.json(
     rows.map((r) => ({
       ...r,
@@ -771,7 +893,8 @@ app.get('/api/feed', requireAuth, (req, res) => {
       is_mine: r.owner_id === req.userId,
       image_url: absoluteUploadUrl(req, r.image_path),
       pet_photo_url: absoluteUploadUrl(req, r.photo_path),
-      shared_image_url: absoluteUploadUrl(req, r.shared_image_path)
+      shared_image_url: absoluteUploadUrl(req, r.shared_image_path),
+      tagged_pets: taggedPetsFor(req, tagMap, r.id)
     }))
   );
 });
@@ -822,8 +945,17 @@ app.post('/api/posts', requireAuth, writeLimiter, (req, res, next) => {
   const info = db
     .prepare('INSERT INTO posts (pet_id, caption, media, image_path) VALUES (?, ?, ?, ?)')
     .run(pet.id, trimmedCaption.slice(0, 280), '📸', imagePath);
+  const postId = info.lastInsertRowid;
 
-  res.json({ id: info.lastInsertRowid, image_url: absoluteUploadUrl(req, imagePath) });
+  const taggedPetIds = sanitizeTaggedPetIds(req.body.tagged_pet_ids);
+  const tagged = attachTags('post', postId, taggedPetIds, pet.id);
+  tagged.forEach((taggedPet) => notify(taggedPet.owner_id, req.userId, pet.id, 'tag_post', { postId }));
+
+  res.json({
+    id: postId,
+    image_url: absoluteUploadUrl(req, imagePath),
+    tagged_pets: formatTagged(req, tagged)
+  });
 });
 
 app.get('/api/posts/:id/comments', requireAuth, (req, res) => {
@@ -846,16 +978,19 @@ app.get('/api/posts/:id/comments', requireAuth, (req, res) => {
     .all(postId)
     .filter((r) => !blocked.has(r.pet_id));
 
+  const tagMap = tagsFor('comment', rows.map((r) => r.id));
+
   res.json(rows.map((r) => ({
     ...r,
     is_mine: myPet ? r.pet_id === myPet.id : false,
-    photo_url: absoluteUploadUrl(req, r.photo_path)
+    photo_url: absoluteUploadUrl(req, r.photo_path),
+    tagged_pets: taggedPetsFor(req, tagMap, r.id)
   })));
 });
 
 app.post('/api/posts/:id/comments', requireAuth, writeLimiter, (req, res) => {
   const postId = Number(req.params.id);
-  const { body } = req.body;
+  const { body, taggedPetIds } = req.body;
   if (!body || !body.trim()) return res.status(400).json({ error: 'El comentario no puede estar vacío' });
 
   const post = db
@@ -873,8 +1008,16 @@ app.post('/api/posts/:id/comments', requireAuth, writeLimiter, (req, res) => {
   const info = db
     .prepare('INSERT INTO comments (post_id, pet_id, body) VALUES (?, ?, ?)')
     .run(postId, pet.id, body.trim().slice(0, 280));
+  const commentId = info.lastInsertRowid;
 
   notify(post.owner_id, req.userId, pet.id, 'comment', { postId });
+
+  // El body acá es JSON (no FormData, a diferencia de crear una publicación
+  // o historia), así que taggedPetIds llega como array directo — lo
+  // convertimos a JSON string sólo para reusar el mismo sanitizador.
+  const sanitizedTagIds = sanitizeTaggedPetIds(JSON.stringify(Array.isArray(taggedPetIds) ? taggedPetIds : []));
+  const tagged = attachTags('comment', commentId, sanitizedTagIds, pet.id);
+  tagged.forEach((taggedPet) => notify(taggedPet.owner_id, req.userId, pet.id, 'tag_comment', { postId }));
 
   const comment = db
     .prepare(
@@ -883,9 +1026,14 @@ app.post('/api/posts/:id/comments', requireAuth, writeLimiter, (req, res) => {
        FROM comments JOIN pets ON pets.id = comments.pet_id
        WHERE comments.id = ?`
     )
-    .get(info.lastInsertRowid);
+    .get(commentId);
 
-  res.json({ ...comment, is_mine: true, photo_url: absoluteUploadUrl(req, comment.photo_path) });
+  res.json({
+    ...comment,
+    is_mine: true,
+    photo_url: absoluteUploadUrl(req, comment.photo_path),
+    tagged_pets: formatTagged(req, tagged)
+  });
 });
 
 // Editar un comentario propio (sólo quien lo escribió — ni siquiera el
@@ -1114,14 +1262,20 @@ app.post('/api/stories', requireAuth, writeLimiter, (req, res, next) => {
   const info = db
     .prepare('INSERT INTO stories (pet_id, media_path, media_type, music_path, mute_original, overlays) VALUES (?, ?, ?, ?, ?, ?)')
     .run(pet.id, mediaFile.filename, mediaType, musicFile ? musicFile.filename : null, muteOriginal, overlays.length ? JSON.stringify(overlays) : null);
+  const storyId = info.lastInsertRowid;
+
+  const taggedPetIds = sanitizeTaggedPetIds(req.body.tagged_pet_ids);
+  const tagged = attachTags('story', storyId, taggedPetIds, pet.id);
+  tagged.forEach((taggedPet) => notify(taggedPet.owner_id, req.userId, pet.id, 'tag_story', { storyId }));
 
   res.json({
-    id: info.lastInsertRowid,
+    id: storyId,
     media_url: absoluteUploadUrl(req, mediaFile.filename),
     media_type: mediaType,
     music_url: musicFile ? absoluteUploadUrl(req, musicFile.filename) : null,
     mute_original: !!muteOriginal,
-    overlays
+    overlays,
+    tagged_pets: formatTagged(req, tagged)
   });
 });
 
@@ -1136,6 +1290,8 @@ app.get('/api/stories', requireAuth, (req, res) => {
        ORDER BY stories.created_at ASC`
     )
     .all();
+
+  const tagMap = tagsFor('story', rows.map((r) => r.id));
 
   const byPet = new Map();
   rows.forEach((r) => {
@@ -1161,7 +1317,8 @@ app.get('/api/stories', requireAuth, (req, res) => {
       music_url: r.music_path ? absoluteUploadUrl(req, r.music_path) : null,
       mute_original: !!r.mute_original,
       overlays,
-      created_at: r.created_at
+      created_at: r.created_at,
+      tagged_pets: taggedPetsFor(req, tagMap, r.id)
     });
   });
 

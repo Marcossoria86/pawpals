@@ -106,6 +106,7 @@ function ReelItem({ reel, showToast, onViewPet, onLike, onCommentCountChange }) 
             isPostOwner={reel.is_mine}
             showToast={showToast}
             onCountChange={onCommentCountChange}
+            onViewPet={onViewPet}
           />
         </div>
       )}

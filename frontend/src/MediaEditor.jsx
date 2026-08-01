@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause } from './Icons';
+import PetTagPicker from './PetTagPicker';
+import { IconClose, IconText, IconSticker, IconMusic, IconTrash, IconPlayPause, IconTag } from './Icons';
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -45,10 +46,12 @@ export default function MediaEditor({
   mediaType = 'image',
   aspect = 9 / 16,
   allowMusic = false,
+  allowTagging = false,
   title = 'Editar',
   confirmLabel = 'Publicar',
   onConfirm,
-  onCancel
+  onCancel,
+  showToast
 }) {
   const [overlays, setOverlays] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -60,6 +63,8 @@ export default function MediaEditor({
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [muteOriginal, setMuteOriginal] = useState(false);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [taggedPets, setTaggedPets] = useState([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
   const frameRef = useRef(null);
   const dragRef = useRef(null);
@@ -266,7 +271,7 @@ export default function MediaEditor({
   function handleConfirm() {
     if (musicFile && !rightsConfirmed) return;
     previewAudioRef.current?.pause();
-    onConfirm({ overlays, musicFile, muteOriginal });
+    onConfirm({ overlays, musicFile, muteOriginal, taggedPetIds: taggedPets.map((p) => p.pet_id) });
   }
 
   const selected = overlays.find((o) => o.id === selectedId);
@@ -337,6 +342,11 @@ export default function MediaEditor({
           {allowMusic && (
             <button type="button" className={`editor-tool-btn ${panel === 'music' ? 'active' : ''} ${musicFile || muteOriginal ? 'has-value' : ''}`} onClick={() => setPanel((p) => (p === 'music' ? null : 'music'))}>
               <IconMusic size={18} /> <span>{musicFile ? 'Tu música' : 'Música'}</span>
+            </button>
+          )}
+          {allowTagging && (
+            <button type="button" className={`editor-tool-btn ${taggedPets.length ? 'has-value' : ''}`} onClick={() => setTagPickerOpen(true)}>
+              <IconTag size={18} /> <span>{taggedPets.length ? 'Etiquetadas' : 'Etiquetar'}</span>
             </button>
           )}
         </div>
@@ -443,6 +453,15 @@ export default function MediaEditor({
           </button>
         </div>
       </div>
+
+      {tagPickerOpen && (
+        <PetTagPicker
+          initialSelected={taggedPets}
+          onClose={() => setTagPickerOpen(false)}
+          onConfirm={(sel) => { setTaggedPets(sel); setTagPickerOpen(false); }}
+          showToast={showToast || (() => {})}
+        />
+      )}
     </div>,
     document.body
   );

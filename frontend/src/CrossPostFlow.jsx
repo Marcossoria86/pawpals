@@ -47,14 +47,14 @@ export default function CrossPostFlow({ kind, file, onDone, onCancel, showToast 
   }
 
   async function finish(editorResult = {}) {
-    const { overlays = [], musicFile, muteOriginal } = editorResult;
+    const { overlays = [], musicFile, muteOriginal, taggedPetIds } = editorResult;
     setPosting(true);
     try {
       if (kind === 'post') {
         await api.createPost({ caption, photoFile: workingFile });
         showToast('¡Publicado en el feed!');
       } else if (kind === 'story') {
-        await api.createStory(workingFile, { overlays, musicFile, muteOriginal });
+        await api.createStory(workingFile, { overlays, musicFile, muteOriginal, taggedPetIds });
         showToast('¡Historia publicada!');
       } else if (kind === 'reel') {
         await api.createReel({ caption, videoFile: workingFile, overlays });
@@ -118,6 +118,8 @@ export default function CrossPostFlow({ kind, file, onDone, onCancel, showToast 
         mediaType={file.type.startsWith('video/') ? 'video' : 'image'}
         aspect={9 / 16}
         allowMusic={kind === 'story'}
+        allowTagging={kind === 'story'}
+        showToast={showToast}
         title={kind === 'story' ? 'Agregá texto, stickers o música' : 'Agregá texto o stickers al reel'}
         confirmLabel={posting ? 'Publicando…' : kind === 'story' ? 'Publicar historia' : 'Publicar reel'}
         onConfirm={finish}

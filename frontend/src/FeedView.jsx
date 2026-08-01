@@ -7,7 +7,8 @@ import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import ReportModal from './ReportModal';
 import NewPostComposer from './NewPostComposer';
-import { IconHeart, IconShare, IconFlag, IconCamera } from './Icons';
+import TaggedPetsChips from './TaggedPetsChips';
+import { IconHeart, IconShare, IconFlag, IconCamera, IconGallery } from './Icons';
 
 function timeAgo(isoLike) {
   const date = new Date(isoLike.replace(' ', 'T') + 'Z');
@@ -33,12 +34,15 @@ export default function FeedView({
   const [loading, setLoading] = useState(true);
   const [composeHidden, setComposeHidden] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composerInitialPhoto, setComposerInitialPhoto] = useState(null);
   const [shareModalPostId, setShareModalPostId] = useState(null);
   const [shareCaption, setShareCaption] = useState('');
   const [sharing, setSharing] = useState(false);
   const [reportPostId, setReportPostId] = useState(null);
   const [openMenuPostId, setOpenMenuPostId] = useState(null);
   const lastScrollY = useRef(0);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   async function load() {
     setLoading(true);
@@ -81,7 +85,28 @@ export default function FeedView({
 
   function handlePosted() {
     setComposerOpen(false);
+    setComposerInitialPhoto(null);
     load();
+  }
+
+  // El icono de cámara del cuadro de "publicar" abre la cámara del teléfono
+  // directamente (con capture="environment" el navegador salta el menú de
+  // "Fototeca/Tomar foto/Elegir archivo" de iOS y va directo a la cámara —
+  // el mismo truco que ya usa el ícono de cámara del selector de fotos). El
+  // ícono de galería, al lado, abre el selector normal para elegir una foto
+  // ya guardada.
+  function openCamera() {
+    cameraInputRef.current?.click();
+  }
+  function openGallery() {
+    galleryInputRef.current?.click();
+  }
+  function handleCapturedFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setComposerInitialPhoto(file);
+    setComposerOpen(true);
   }
 
   async function handleLike(postId) {
@@ -148,15 +173,33 @@ export default function FeedView({
 
   return (
     <>
-      <button
-        type="button"
-        className={`compose compose-trigger ${composeHidden ? 'hidden' : ''}`}
-        onClick={() => setComposerOpen(true)}
-      >
-        <PetAvatar photoUrl={me?.pet?.photo_url} species={me?.pet?.species} color={me?.pet?.color} size={36} />
-        <span className="compose-trigger-text">¿Qué está haciendo tu mascota hoy?</span>
-        <span className="compose-trigger-camera"><IconCamera size={18} /></span>
-      </button>
+      <div className={`compose compose-trigger ${composeHidden ? 'hidden' : ''}`}>
+        <button type="button" className="compose-trigger-main" onClick={() => setComposerOpen(true)}>
+          <PetAvatar photoUrl={me?.pet?.photo_url} species={me?.pet?.species} color={me?.pet?.color} size={36} />
+          <span className="compose-trigger-text">¿Qué está haciendo tu mascota hoy?</span>
+        </button>
+        <button type="button" className="compose-trigger-icon-btn" onClick={openCamera} aria-label="Abrir cámara">
+          <IconCamera size={18} />
+        </button>
+        <button type="button" className="compose-trigger-icon-btn" onClick={openGallery} aria-label="Elegir de la galería">
+          <IconGallery size={18} />
+        </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={handleCapturedFile}
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleCapturedFile}
+        />
+      </div>
 
       <section className="feed-posts">
         {loading && <div className="section-title">Cargando feed…</div>}
@@ -210,6 +253,7 @@ export default function FeedView({
               </div>
             )}
             {post.caption && <div className="post-body">{post.caption}</div>}
+            <TaggedPetsChips pets={post.tagged_pets} onViewPet={onViewPet} />
             {post.shared_post_id && (
               <div className="shared-embed">
                 {post.shared_pet_name ? (
@@ -239,6 +283,7 @@ export default function FeedView({
                 isPostOwner={post.is_mine}
                 showToast={showToast}
                 onCountChange={handleCommentCountChange}
+                onViewPet={onViewPet}
               />
               <button className="action" onClick={() => { setShareModalPostId(post.id); setShareCaption(''); }}>
                 <IconShare size={22} /> <span>Compartir</span>
@@ -284,9 +329,10 @@ export default function FeedView({
       {composerOpen && (
         <NewPostComposer
           me={me}
-          onClose={() => setComposerOpen(false)}
+          onClose={() => { setComposerOpen(false); setComposerInitialPhoto(null); }}
           onPosted={handlePosted}
           showToast={showToast}
+          initialPhotoFile={composerInitialPhoto}
         />
       )}
     </>

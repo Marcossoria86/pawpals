@@ -315,6 +315,7 @@ function App() {
                   refreshSignal={storiesRefreshTick}
                   onCreatedPost={() => setFeedRefreshTick((t) => t + 1)}
                   onCreatedReel={() => setReelsRefreshTick((t) => t + 1)}
+                  onViewPet={setViewingPetId}
                 />
                 <FeedView
                   me={me}

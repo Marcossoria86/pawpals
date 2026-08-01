@@ -138,6 +138,20 @@ CREATE TABLE IF NOT EXISTS blocks (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(blocker_pet_id, blocked_pet_id)
 );
+
+-- Etiquetas de mascotas: quién quedó etiquetado en qué (una publicación, un
+-- comentario o una historia). target_type + target_id apunta al registro
+-- etiquetado (posts.id / comments.id / stories.id según el caso) en vez de
+-- tener tres tablas casi idénticas — así el mismo helper de backend sirve
+-- para los tres lugares (ver attachTags/tagsFor en index.js).
+CREATE TABLE IF NOT EXISTS pet_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_type TEXT NOT NULL,
+  target_id INTEGER NOT NULL,
+  pet_id INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pet_tags_target ON pet_tags(target_type, target_id);
 `);
 
 // Migraciones simples: agregan columnas nuevas a tablas que ya existían en
@@ -166,6 +180,10 @@ ensureColumn('users', 'reset_token', 'TEXT');
 ensureColumn('users', 'reset_token_expires', 'TEXT');
 // Se marca cuando se edita un comentario, para mostrar "(editado)" en el frontend.
 ensureColumn('comments', 'edited_at', 'TEXT');
+// Notificaciones de "te etiquetaron en una historia": las de post/comentario
+// reutilizan la columna post_id que ya existía, pero una historia no tiene
+// post_id, así que necesita la suya propia.
+ensureColumn('notifications', 'story_id', 'INTEGER');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

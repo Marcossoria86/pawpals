@@ -51,6 +51,13 @@
   }
 }
 *{box-sizing:border-box;}
+/* Sin esto, iOS Safari (y el Chromium de las pruebas) muestran un flash
+   gris/negro semitransparente encima de cualquier botón al tocarlo (el
+   "tap highlight" nativo) — con tantos botones nuevos en esta pantalla,
+   ese flash se notaba como otro "recuadro gris" más. Cada botón sigue
+   teniendo su propio estado de tocado si lo definimos (hover/active), esto
+   sólo saca el overlay automático del navegador. */
+button, a, [role="button"]{ -webkit-tap-highlight-color: transparent; }
 html,body,#root{height:100%;}
 html,body{
   /* Evita que la página se deslice hacia los costados y el doble-tap-zoom

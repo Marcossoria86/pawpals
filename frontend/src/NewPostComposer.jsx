@@ -4,21 +4,27 @@ import { api } from './api';
 import PetAvatar from './PetAvatar';
 import MediaPickerModal from './MediaPickerModal';
 import ImageCropper from './ImageCropper';
+import PetTagPicker from './PetTagPicker';
 import ErrorBoundary from './ErrorBoundary';
-import { IconClose, IconCamera } from './Icons';
+import { IconClose, IconCamera, IconTag } from './Icons';
 
 // Pantalla completa de "Nueva publicación", estilo Facebook: se abre tanto
 // al tocar la barra "¿Qué está haciendo tu mascota hoy?" del feed como
 // desde el menú "+" del header (ver App.jsx) — por eso vive como su propio
 // componente en vez de estar mezclado adentro de FeedView, así las dos
 // entradas comparten exactamente la misma pantalla sin duplicar lógica.
-export default function NewPostComposer({ me, onClose, onPosted, showToast }) {
+export default function NewPostComposer({ me, onClose, onPosted, showToast, initialPhotoFile }) {
   const [caption, setCaption] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [posting, setPosting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [cropFile, setCropFile] = useState(null);
+  // Si el composer se abrió desde la cámara o "Elegir" de la barra del feed
+  // (ver FeedView), ya llega con una foto — la mandamos directo a recortar
+  // en vez de esperar a que la persona toque "Foto" de nuevo.
+  const [cropFile, setCropFile] = useState(initialPhotoFile || null);
+  const [taggedPets, setTaggedPets] = useState([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
   function handlePickerSelect(file) {
     setPickerOpen(false);
@@ -44,7 +50,7 @@ export default function NewPostComposer({ me, onClose, onPosted, showToast }) {
     if (!caption.trim() && !photoFile) return;
     setPosting(true);
     try {
-      await api.createPost({ caption, photoFile });
+      await api.createPost({ caption, photoFile, taggedPetIds: taggedPets.map((p) => p.pet_id) });
       showToast('¡Publicado en el feed!');
       onPosted();
     } catch (err) {
@@ -88,9 +94,24 @@ export default function NewPostComposer({ me, onClose, onPosted, showToast }) {
         </div>
       )}
 
+      {taggedPets.length > 0 && (
+        <div className="postnew-tagged-row">
+          <span>Con:</span>
+          {taggedPets.map((p) => (
+            <span className="tag-chip" key={p.pet_id}>
+              <PetAvatar photoUrl={p.photo_url} species={p.species} color={p.color} size={18} />
+              {p.pet_name}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="postnew-bottom-row">
         <button type="button" className="postnew-photo-btn" onClick={() => setPickerOpen(true)}>
           <IconCamera size={18} /> {photoFile ? 'Cambiar foto' : 'Foto'}
+        </button>
+        <button type="button" className="postnew-photo-btn" onClick={() => setTagPickerOpen(true)}>
+          <IconTag size={18} /> {taggedPets.length ? `Etiquetadas (${taggedPets.length})` : 'Etiquetar'}
         </button>
         <button
           type="button"
@@ -121,6 +142,15 @@ export default function NewPostComposer({ me, onClose, onPosted, showToast }) {
             onCancel={() => setCropFile(null)}
           />
         </ErrorBoundary>
+      )}
+
+      {tagPickerOpen && (
+        <PetTagPicker
+          initialSelected={taggedPets}
+          onClose={() => setTagPickerOpen(false)}
+          onConfirm={(sel) => { setTaggedPets(sel); setTagPickerOpen(false); }}
+          showToast={showToast}
+        />
       )}
     </div>,
     document.body

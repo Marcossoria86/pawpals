@@ -69,17 +69,19 @@ export const api = {
   updateLocationPrivacy: (shareLocation) => request('/api/pets/me/privacy', { method: 'PATCH', body: JSON.stringify({ shareLocation }) }),
   deleteAccount: (password) => request('/api/me', { method: 'DELETE', body: JSON.stringify({ password }) }),
   feed: () => request('/api/feed'),
-  createPost: ({ caption, photoFile }) => {
+  createPost: ({ caption, photoFile, taggedPetIds }) => {
     const form = new FormData();
     form.append('caption', caption);
     if (photoFile) form.append('photo', photoFile);
+    if (taggedPetIds && taggedPetIds.length) form.append('tagged_pet_ids', JSON.stringify(taggedPetIds));
     return request('/api/posts', { method: 'POST', body: form });
   },
+  searchPets: (q) => request(`/api/pets/search?q=${encodeURIComponent(q)}`),
   toggleLike: (postId) => request(`/api/posts/${postId}/like`, { method: 'POST' }),
   deletePost: (postId) => request(`/api/posts/${postId}`, { method: 'DELETE' }),
   toggleComments: (postId) => request(`/api/posts/${postId}/toggle-comments`, { method: 'POST' }),
   comments: (postId) => request(`/api/posts/${postId}/comments`),
-  addComment: (postId, body) => request(`/api/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  addComment: (postId, body, taggedPetIds) => request(`/api/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify({ body, taggedPetIds: taggedPetIds || [] }) }),
   editComment: (commentId, body) => request(`/api/comments/${commentId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
   deleteComment: (commentId) => request(`/api/comments/${commentId}`, { method: 'DELETE' }),
   nearby: () => request('/api/nearby'),
@@ -103,12 +105,13 @@ export const api = {
     request('/api/reports', { method: 'POST', body: JSON.stringify({ targetType, targetId, reason, details }) }),
 
   stories: () => request('/api/stories'),
-  createStory: (mediaFile, { overlays, musicFile, muteOriginal } = {}) => {
+  createStory: (mediaFile, { overlays, musicFile, muteOriginal, taggedPetIds } = {}) => {
     const form = new FormData();
     form.append('media', mediaFile);
     if (overlays && overlays.length) form.append('overlays', JSON.stringify(overlays));
     if (musicFile) form.append('music', musicFile);
     if (muteOriginal) form.append('mute_original', '1');
+    if (taggedPetIds && taggedPetIds.length) form.append('tagged_pet_ids', JSON.stringify(taggedPetIds));
     return request('/api/stories', { method: 'POST', body: form });
   },
 

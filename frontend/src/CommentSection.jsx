@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
 import ReportModal from './ReportModal';
-import { IconComment } from './Icons';
+import PetTagPicker from './PetTagPicker';
+import TaggedPetsChips from './TaggedPetsChips';
+import { IconComment, IconTag, IconClose } from './Icons';
 
-export default function CommentSection({ postId, commentsCount, disabled, isPostOwner, showToast, onCountChange }) {
+export default function CommentSection({ postId, commentsCount, disabled, isPostOwner, showToast, onCountChange, onViewPet }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [comments, setComments] = useState(null); // null = todavía no se cargaron
@@ -14,6 +16,8 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const [reportCommentId, setReportCommentId] = useState(null);
+  const [taggedPets, setTaggedPets] = useState([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
   async function toggleOpen() {
     if (disabled) return;
@@ -36,9 +40,10 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
     if (!text.trim()) return;
     setSending(true);
     try {
-      const created = await api.addComment(postId, text.trim());
+      const created = await api.addComment(postId, text.trim(), taggedPets.map((p) => p.pet_id));
       setComments((prev) => [...(prev || []), created]);
       setText('');
+      setTaggedPets([]);
       onCountChange?.(postId, (commentsCount || 0) + 1);
     } catch (err) {
       showToast(err.message);
@@ -112,9 +117,12 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
                   <button type="button" className="comment-edit-cancel" onClick={() => setEditingId(null)}>Cancelar</button>
                 </div>
               ) : (
-                <div className="comment-bubble">
-                  <span className="comment-author">{c.pet_name}</span> {c.body}
-                  {c.edited_at && <span className="comment-edited-tag"> (editado)</span>}
+                <div>
+                  <div className="comment-bubble">
+                    <span className="comment-author">{c.pet_name}</span> {c.body}
+                    {c.edited_at && <span className="comment-edited-tag"> (editado)</span>}
+                  </div>
+                  <TaggedPetsChips pets={c.tagged_pets} onViewPet={onViewPet} compact />
                 </div>
               )}
               {editingId !== c.id && (c.is_mine || isPostOwner) && (
@@ -154,7 +162,22 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
               )}
             </div>
           ))}
+          {taggedPets.length > 0 && (
+            <div className="comment-tagged-row">
+              {taggedPets.map((p) => (
+                <span className="tag-chip" key={p.pet_id}>
+                  {p.pet_name}
+                  <button type="button" onClick={() => setTaggedPets((prev) => prev.filter((x) => x.pet_id !== p.pet_id))} aria-label="Quitar">
+                    <IconClose size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="comment-compose">
+            <button type="button" className="comment-tag-btn" onClick={() => setTagPickerOpen(true)} aria-label="Etiquetar mascotas">
+              <IconTag size={17} />
+            </button>
             <input
               type="text"
               placeholder="Escribe un comentario…"
@@ -168,6 +191,15 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
             </button>
           </div>
         </div>
+      )}
+
+      {tagPickerOpen && (
+        <PetTagPicker
+          initialSelected={taggedPets}
+          onClose={() => setTagPickerOpen(false)}
+          onConfirm={(sel) => { setTaggedPets(sel); setTagPickerOpen(false); }}
+          showToast={showToast}
+        />
       )}
 
       {reportCommentId !== null && (

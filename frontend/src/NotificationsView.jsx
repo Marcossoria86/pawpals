@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import PetAvatar from './PetAvatar';
-import { IconHeart, IconComment, IconShare, IconPawSmall, IconCheck, IconClose, IconAddUser } from './Icons';
+import { IconHeart, IconComment, IconShare, IconPawSmall, IconCheck, IconClose, IconAddUser, IconTag } from './Icons';
 import { IconBell } from './NavIcons';
 
 function timeAgo(isoLike) {
@@ -26,6 +26,9 @@ function messageFor(n) {
     case 'playdate_accepted': return `${who} aceptó tu solicitud de cita de juego`;
     case 'playdate_declined': return `${who} rechazó tu solicitud de cita de juego`;
     case 'follow': return `${who} empezó a seguirte`;
+    case 'tag_post': return `${who} etiquetó a tu mascota en una publicación`;
+    case 'tag_comment': return `${who} etiquetó a tu mascota en un comentario`;
+    case 'tag_story': return `${who} etiquetó a tu mascota en una historia`;
     default: return `${who} interactuó contigo`;
   }
 }
@@ -39,6 +42,10 @@ function iconFor(type) {
     case 'playdate_accepted': return <IconCheck size={16} />;
     case 'playdate_declined': return <IconClose size={16} />;
     case 'follow': return <IconAddUser size={16} />;
+    case 'tag_post':
+    case 'tag_comment':
+    case 'tag_story':
+      return <IconTag size={16} />;
     default: return <IconBell />;
   }
 }

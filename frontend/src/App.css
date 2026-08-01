@@ -369,14 +369,36 @@ main{
   cursor:not-allowed;
 }
 
-/* Barra de "¿Qué está haciendo tu mascota hoy?" del feed, ahora un botón
-   (no un input real): tocarla en cualquier parte abre la pantalla completa
-   de "Nueva publicación" (NewPostComposer), estilo Facebook. */
+/* Barra de "¿Qué está haciendo tu mascota hoy?" del feed: un <div> con TRES
+   botones adentro (no un solo botón grande como antes) — tocar el texto
+   abre la pantalla completa de "Nueva publicación" en blanco, tocar la
+   cámara abre la cámara del teléfono directamente, y tocar la galería abre
+   el selector normal de fotos. Los tres terminan en la misma pantalla
+   (NewPostComposer), con o sin una foto ya elegida. */
 .compose-trigger{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
   width:100%;
+}
+/* OJO especificidad: ".compose button" (más arriba, sección "Compose box")
+   pinta CUALQUIER <button> adentro de .compose con el fondo de marca —
+   necesario para el compose viejo de "Compartir", pero de más acá porque
+   .compose-trigger-main/.compose-trigger-icon-btn TAMBIÉN son <button>
+   dentro de .compose.compose-trigger. Con un solo nombre de clase quedaban
+   con la MISMA especificidad que ".compose button" (una clase + un
+   elemento) y esa regla vieja podía ganar el empate y pintarlos de color
+   marca sólido — por eso acá van con el selector completo
+   ".compose-trigger .compose-trigger-main" (dos clases), que sí le gana. */
+.compose-trigger .compose-trigger-main{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1;
+  min-width:0;
+  border:none;
+  background:none;
+  padding:0;
   text-align:left;
   cursor:pointer;
   font-family:inherit;
@@ -390,13 +412,16 @@ main{
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.compose-trigger-camera{
+.compose-trigger .compose-trigger-icon-btn{
   width:34px;height:34px;
   border-radius:50%;
   background:var(--accent-soft);
   color:var(--accent);
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
+  border:none;
+  padding:0;
+  cursor:pointer;
 }
 
 /* Pantalla completa de "Nueva publicación" — mismo look oscuro que el
@@ -468,9 +493,20 @@ main{
 .postnew-bottom-row{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
   padding:10px 16px calc(14px + env(safe-area-inset-bottom));
   border-top:1px solid rgba(255,255,255,0.12);
+  flex-shrink:0;
+  flex-wrap:wrap;
+}
+.postnew-tagged-row{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:0 16px 10px;
+  font-size:12.5px;
+  color:#c8c8cc;
   flex-shrink:0;
 }
 .postnew-photo-btn{
@@ -594,13 +630,22 @@ main{
 }
 
 /* Post card */
+/* Antes cada publicación era una "tarjeta" flotante (con borde redondeado
+   y separada de las demás) — el usuario pidió el estilo Twitter/Instagram:
+   ancho completo de la pantalla, sin bordes redondeados, cada una separada
+   de la siguiente por una simple línea horizontal. El margin negativo
+   cancela el padding horizontal de <main> (16px) para que la publicación
+   llegue hasta el borde de la pantalla; el texto/acciones adentro
+   mantienen su propio padding así no quedan pegados al borde. */
 .post{
   background:var(--card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  margin-bottom:14px;
+  border:none;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  margin:0 -16px;
   overflow:hidden;
 }
+.post:first-child{ border-top:1px solid var(--line); }
 .post-head{
   display:flex;
   align-items:center;
@@ -1031,7 +1076,13 @@ nav.tabbar.tabbar-hidden{
   width:44px;
   height:34px;
   border-radius:14px;
-  background:var(--bg);
+  /* Antes cada ícono (activo o no) tenía su propio fondo gris (var(--bg)) —
+     seis cuadraditos grises pegados uno al lado del otro se leen como una
+     franja gris sólida cruzando toda la barra de abajo, que es justo lo que
+     venía molestando. Ahora sólo la pestaña ACTIVA tiene un fondo (ver
+     .tab.active .tab-icon, más abajo, con el color de marca) — las demás
+     quedan transparentes, estilo Facebook/Instagram. */
+  background:transparent;
   transition: background .15s ease;
 }
 .tab .tab-icon svg{ display:block; }
@@ -1501,6 +1552,136 @@ main.no-pad{ padding:0; }
 .follow-list-body{ min-width:0; }
 .follow-list-name{ font-weight:700; font-size:13.5px; color:var(--ink); }
 .follow-list-breed{ font-size:11.5px; color:var(--ink-soft); }
+.follow-list-row.selected{ background:var(--chip-bg); border-radius:10px; }
+.follow-list-row.tag-picker-row{ justify-content:space-between; }
+
+/* Selector de "etiquetar mascotas" (PetTagPicker) — reusa el look de
+   follow-list-card/modal-card, más su propio buscador y la fila de
+   mascotas ya elegidas. Se usa desde NewPostComposer, CommentSection y
+   MediaEditor (ver ese componente para el detalle). */
+.tag-picker-card{ max-height:75vh; }
+.tag-picker-search{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--chip-bg);
+  border-radius:10px;
+  padding:8px 10px;
+  margin-bottom:8px;
+  color:var(--ink-soft);
+  flex-shrink:0;
+}
+.tag-picker-search input{
+  flex:1;
+  border:none;
+  background:transparent;
+  outline:none;
+  font-size:13.5px;
+  color:var(--ink);
+  font-family:inherit;
+}
+.tag-picker-selected{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:8px;
+  flex-shrink:0;
+}
+.tag-picker-results{ flex:1; }
+
+/* Ficha genérica de "mascota etiquetada" — se usa en el chip de
+   seleccionadas del picker, en la vista previa del composer y debajo del
+   cuadro de comentar. */
+.tag-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  background:var(--chip-bg);
+  color:var(--ink);
+  border:none;
+  border-radius:999px;
+  padding:4px 9px 4px 5px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.postnew-tagged-row .tag-chip{
+  background:rgba(255,255,255,0.1);
+  color:#fff;
+  cursor:default;
+  padding:4px 8px;
+}
+
+/* "Con: Firulais, Toby" debajo de una publicación/comentario/historia. */
+.tagged-pets-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  font-size:12px;
+  color:var(--ink-soft);
+  margin-top:2px;
+}
+.tagged-pets-row.compact{ font-size:11.5px; margin-top:1px; }
+.tagged-pets-label{ font-weight:600; }
+.tagged-pet-link{
+  background:none;
+  border:none;
+  padding:0;
+  color:var(--brand);
+  font-weight:700;
+  font-size:inherit;
+  cursor:pointer;
+}
+/* Adentro del visor de historias (fondo oscuro, posicionado arriba del
+   contenido) hay que despegarlo del flujo normal y darle contraste, si no
+   queda invisible sobre el fondo negro o empuja el layout del visor. */
+.story-viewer-inner > .tagged-pets-row{
+  position:absolute;
+  left:14px;
+  right:14px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index:5;
+  background:rgba(0,0,0,0.45);
+  border-radius:10px;
+  padding:6px 10px;
+  color:#fff;
+}
+.story-viewer-inner > .tagged-pets-row .tagged-pets-label{ color:#e4e4e4; }
+.story-viewer-inner > .tagged-pets-row .tagged-pet-link{ color:#fff; text-decoration:underline; }
+
+/* Mismo problema de especificidad que .compose-trigger-main (ver ese
+   comentario): ".comment-compose button" ya existe para el botón "Enviar"
+   y con un solo nombre de clase le ganaba a este botón también, pintándolo
+   con el color de acento sólido en vez del gris suave que tiene que tener
+   un botón secundario. */
+.comment-compose .comment-tag-btn{
+  border:1px solid var(--line);
+  background:var(--chip-bg);
+  color:var(--ink-soft);
+  border-radius:10px;
+  width:32px;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  padding:0;
+}
+.comment-tagged-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.comment-tagged-row .tag-chip{ padding:3px 4px 3px 9px; }
+.comment-tagged-row .tag-chip button{
+  border:none;
+  background:none;
+  color:inherit;
+  display:flex;
+  align-items:center;
+  padding:2px;
+  cursor:pointer;
+}
 .modal-file-input{
   width:100%;
   margin-bottom:10px;
@@ -2140,11 +2321,17 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
 }
 .editor-toolbar{
   display:flex;
+  flex-wrap:wrap;
   gap:8px;
   margin-top:12px;
 }
 .editor-tool-btn{
   flex:1;
+  /* Sin esto, un botón con una etiqueta más larga que el resto (como
+     "Etiquetar", el cuarto botón que se suma en historias) no se achica
+     junto con los demás — se sale de la tarjeta en vez de compartir el
+     espacio parejo. */
+  min-width:0;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -2157,6 +2344,11 @@ textarea.modal-text-input{ resize:vertical; font-family:inherit; }
   padding:9px 6px;
   border-radius:12px;
   cursor:pointer;
+  white-space:nowrap;
+}
+.editor-tool-btn span{
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .editor-tool-btn.active, .editor-tool-btn.has-value{
   background:var(--brand-soft);

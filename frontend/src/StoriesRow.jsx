@@ -9,6 +9,7 @@ import MediaPickerModal from './MediaPickerModal';
 import CrossPostFlow from './CrossPostFlow';
 import OverlayLayer from './OverlayLayer';
 import ErrorBoundary from './ErrorBoundary';
+import TaggedPetsChips from './TaggedPetsChips';
 import { IconClose, IconVolume } from './Icons';
 
 // Música de una historia — un audio que la propia persona subió (no una
@@ -80,7 +81,7 @@ function StoryVideo({ src, onEnded, forceMuted = false }) {
 // SIEMPRE por encima de todo (header, cuadro de "publicar", barra de abajo)
 // sin importar en qué parte del feed esté anidado, evitando el bug de
 // z-index/posición fija dentro de contenedores con scroll en Safari/iOS.
-function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
+function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev, onViewPet }) {
   const story = group.stories[storyIndex];
   const hasMusic = !!story.music_url;
   const isVideo = story.media_type === 'video';
@@ -114,6 +115,7 @@ function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
           {hasMusic && <StoryAudio src={story.music_url} offset={musicOffset} />}
           <OverlayLayer overlays={story.overlays} />
         </div>
+        <TaggedPetsChips pets={story.tagged_pets} onViewPet={(petId) => { onClose(); onViewPet?.(petId); }} />
         <div className="story-tap-zone left" onClick={onPrev} />
         <div className="story-tap-zone right" onClick={onNext} />
       </div>
@@ -125,7 +127,7 @@ function StoryViewerOverlay({ group, storyIndex, onClose, onNext, onPrev }) {
 // Fila de historias arriba del feed, estilo Facebook/Instagram: círculos con
 // las mascotas que publicaron algo en las últimas 24hs, la propia primero,
 // más un botón para agregar una historia nueva (foto o video corto).
-export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost, onCreatedReel }) {
+export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost, onCreatedReel, onViewPet }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewer, setViewer] = useState(null); // { groupIndex, storyIndex }
@@ -210,10 +212,10 @@ export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost
     openEditor(croppedFile);
   }
 
-  function handleEditorConfirm({ overlays, musicFile, muteOriginal }) {
+  function handleEditorConfirm({ overlays, musicFile, muteOriginal, taggedPetIds }) {
     const file = editFile;
     closeEditor();
-    uploadStoryFile(file, { overlays, musicFile, muteOriginal });
+    uploadStoryFile(file, { overlays, musicFile, muteOriginal, taggedPetIds });
   }
 
   function openViewer(groupIndex) {
@@ -338,6 +340,7 @@ export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost
           onClose={closeViewer}
           onNext={nextStory}
           onPrev={prevStory}
+          onViewPet={onViewPet}
         />
       )}
 
@@ -379,6 +382,8 @@ export default function StoriesRow({ showToast, refreshSignal = 0, onCreatedPost
             mediaType={editFile.type.startsWith('video/') ? 'video' : 'image'}
             aspect={9 / 16}
             allowMusic
+            allowTagging
+            showToast={showToast}
             title="Agregá texto, stickers o música"
             confirmLabel="Publicar historia"
             onConfirm={handleEditorConfirm}

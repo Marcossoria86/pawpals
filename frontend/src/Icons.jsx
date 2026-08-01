@@ -224,6 +224,17 @@ export function IconPlus({ size = 20 }) {
   );
 }
 
+// Etiqueta (tag) — se usa en el botón "Etiquetar mascotas" de publicaciones,
+// comentarios e historias.
+export function IconTag({ size = 18 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M11.6 4H6a2 2 0 0 0-2 2v5.6c0 .53.21 1.04.59 1.41l8.4 8.4c.78.78 2.05.78 2.83 0l5.6-5.6c.78-.78.78-2.05 0-2.83l-8.4-8.4A2 2 0 0 0 11.6 4Z" strokeLinejoin="round" />
+      <circle cx="8.5" cy="8.5" r="1.3" />
+    </svg>
+  );
+}
+
 export function IconChevronRight({ size = 20 }) {
   return (
     <svg {...COMMON} width={size} height={size} aria-hidden="true">
