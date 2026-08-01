@@ -13,8 +13,11 @@ import ReelsView from './ReelsView';
 import RequestsView from './RequestsView';
 import NotificationsView from './NotificationsView';
 import MessagesView from './MessagesView';
+import NewPostComposer from './NewPostComposer';
+import MediaPickerModal from './MediaPickerModal';
+import CrossPostFlow from './CrossPostFlow';
 import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
-import { IconSearch, IconClose, IconPawPair } from './Icons';
+import { IconSearch, IconClose, IconPawPair, IconPlus, IconGallery, IconCamera } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
 // pendientes de aceptar/rechazar), Cerca de ti (ocupa el lugar que en
@@ -57,6 +60,13 @@ function App() {
   const [feedRefreshTick, setFeedRefreshTick] = useState(0);
   const [storiesRefreshTick, setStoriesRefreshTick] = useState(0);
   const [reelsRefreshTick, setReelsRefreshTick] = useState(0);
+  // Menú "+" del header (Publicación/Historia/Reel, estilo Facebook): vive
+  // acá arriba (no adentro de FeedView/StoriesRow) porque tiene que poder
+  // abrirse sin importar en qué pestaña esté la persona.
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [plusPostOpen, setPlusPostOpen] = useState(false);
+  const [plusPickerDest, setPlusPickerDest] = useState(null); // 'story' | 'reel'
+  const [plusCrossPost, setPlusCrossPost] = useState(null); // { kind, file }
   const mainRef = useRef(null);
   const navRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -91,6 +101,28 @@ function App() {
       setTabbarHidden(false);
       lastScrollTopRef.current = top;
     }
+  }
+
+  function openNewPost() {
+    setPlusMenuOpen(false);
+    setPlusPostOpen(true);
+  }
+
+  function openQuickPicker(dest) {
+    setPlusMenuOpen(false);
+    setPlusPickerDest(dest);
+  }
+
+  function handleQuickPickerSelect(file) {
+    const dest = plusPickerDest;
+    setPlusPickerDest(null);
+    setPlusCrossPost({ kind: dest, file });
+  }
+
+  function handleQuickCrossPostDone(kind) {
+    setPlusCrossPost(null);
+    if (kind === 'story') setStoriesRefreshTick((t) => t + 1);
+    if (kind === 'reel') setReelsRefreshTick((t) => t + 1);
   }
 
   function toggleSearch() {
@@ -222,12 +254,38 @@ function App() {
             <IconPawPair size={20} /> PawPals
           </button>
         )}
+        {!searchOpen && (
+          <div className="header-plus-wrap">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setPlusMenuOpen((v) => !v)}
+              title="Crear"
+              aria-label="Crear"
+            >
+              <IconPlus size={22} />
+            </button>
+            {plusMenuOpen && (
+              <div className="header-plus-dropdown">
+                <button type="button" onClick={openNewPost}>
+                  <IconGallery size={17} /> Publicación
+                </button>
+                <button type="button" onClick={() => openQuickPicker('story')}>
+                  <IconCamera size={17} /> Historia
+                </button>
+                <button type="button" onClick={() => openQuickPicker('reel')}>
+                  <IconReels /> Reel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {searchableTab && (
-          <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={16} /> : <IconSearch size={16} />}</div>
+          <div className="icon-btn" onClick={toggleSearch}>{searchOpen ? <IconClose size={18} /> : <IconSearch size={20} />}</div>
         )}
         {!searchOpen && tab !== 'messages' && (
           <button type="button" className="icon-btn messages-icon-btn" onClick={() => selectTab('messages')} title="Mensajes" aria-label="Mensajes">
-            <IconMessages size={18} />
+            <IconMessages size={22} />
             {unreadMessages > 0 && <span className="tab-badge header-badge">{unreadMessages > 9 ? '9+' : unreadMessages}</span>}
           </button>
         )}
@@ -249,7 +307,7 @@ function App() {
         ) : (
           <>
             {tab === 'feed' && (
-              <>
+              <div className="feed-tab">
                 <StoriesRow
                   showToast={showToast}
                   refreshSignal={storiesRefreshTick}
@@ -257,15 +315,14 @@ function App() {
                   onCreatedReel={() => setReelsRefreshTick((t) => t + 1)}
                 />
                 <FeedView
+                  me={me}
                   showToast={showToast}
                   searchQuery={searchQuery}
                   onViewPet={setViewingPetId}
                   scrollContainerRef={mainRef}
                   refreshSignal={feedRefreshTick}
-                  onCreatedStory={() => setStoriesRefreshTick((t) => t + 1)}
-                  onCreatedReel={() => setReelsRefreshTick((t) => t + 1)}
                 />
-              </>
+              </div>
             )}
             {tab === 'reels' && (
               <ReelsView showToast={showToast} onViewPet={setViewingPetId} refreshSignal={reelsRefreshTick} />
@@ -309,6 +366,38 @@ function App() {
       </nav>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
+
+      {plusPostOpen && (
+        <NewPostComposer
+          me={me}
+          onClose={() => setPlusPostOpen(false)}
+          onPosted={() => {
+            setPlusPostOpen(false);
+            setFeedRefreshTick((t) => t + 1);
+            if (tab !== 'feed') selectTab('feed');
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {plusPickerDest && (
+        <MediaPickerModal
+          destination={plusPickerDest}
+          allowedDestinations={[plusPickerDest]}
+          onSelect={handleQuickPickerSelect}
+          onClose={() => setPlusPickerDest(null)}
+        />
+      )}
+
+      {plusCrossPost && (
+        <CrossPostFlow
+          kind={plusCrossPost.kind}
+          file={plusCrossPost.file}
+          showToast={showToast}
+          onCancel={() => setPlusCrossPost(null)}
+          onDone={handleQuickCrossPostDone}
+        />
+      )}
     </div>
   );
 }

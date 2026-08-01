@@ -215,6 +215,15 @@ export function IconRotate({ size = 16 }) {
   );
 }
 
+export function IconPlus({ size = 20 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function IconChevronRight({ size = 20 }) {
   return (
     <svg {...COMMON} width={size} height={size} aria-hidden="true">

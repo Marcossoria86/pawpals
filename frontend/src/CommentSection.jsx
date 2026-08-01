@@ -80,13 +80,13 @@ export default function CommentSection({ postId, commentsCount, disabled, isPost
   }
 
   if (disabled) {
-    return <div className="action action-disabled"><IconComment size={18} /> <span>Comentarios desactivados</span></div>;
+    return <div className="action action-disabled"><IconComment size={22} /> <span>Comentarios desactivados</span></div>;
   }
 
   return (
     <>
       <button className="action" onClick={toggleOpen}>
-        <IconComment size={18} /> <span>{commentsCount > 0 ? `${commentsCount} comentario${commentsCount === 1 ? '' : 's'}` : 'Comentar'}</span>
+        <IconComment size={22} /> <span>{commentsCount > 0 ? `${commentsCount} comentario${commentsCount === 1 ? '' : 's'}` : 'Comentar'}</span>
       </button>
 
       {open && (

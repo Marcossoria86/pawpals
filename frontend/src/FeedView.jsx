@@ -6,10 +6,7 @@ import PetAvatar from './PetAvatar';
 import CommentSection from './CommentSection';
 import PostMenu from './PostMenu';
 import ReportModal from './ReportModal';
-import MediaPickerModal from './MediaPickerModal';
-import CrossPostFlow from './CrossPostFlow';
-import ImageCropper from './ImageCropper';
-import ErrorBoundary from './ErrorBoundary';
+import NewPostComposer from './NewPostComposer';
 import { IconHeart, IconShare, IconFlag, IconCamera } from './Icons';
 
 function timeAgo(isoLike) {
@@ -25,29 +22,22 @@ function timeAgo(isoLike) {
 }
 
 export default function FeedView({
+  me,
   showToast,
   searchQuery = '',
   onViewPet,
   scrollContainerRef,
-  refreshSignal = 0,
-  onCreatedStory,
-  onCreatedReel
+  refreshSignal = 0
 }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [caption, setCaption] = useState('');
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [posting, setPosting] = useState(false);
+  const [composeHidden, setComposeHidden] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [shareModalPostId, setShareModalPostId] = useState(null);
   const [shareCaption, setShareCaption] = useState('');
   const [sharing, setSharing] = useState(false);
-  const [composeHidden, setComposeHidden] = useState(false);
-  const [cropFile, setCropFile] = useState(null);
   const [reportPostId, setReportPostId] = useState(null);
   const [openMenuPostId, setOpenMenuPostId] = useState(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [crossPost, setCrossPost] = useState(null); // { kind, file }
   const lastScrollY = useRef(0);
 
   async function load() {
@@ -62,9 +52,9 @@ export default function FeedView({
     }
   }
 
-  // El signal cambia cuando OTRA pantalla (historias/reels) crea un post
-  // desde su propia cámara con la píldora en "Publicación" — así el feed
-  // se entera y se actualiza solo. También carga la primera vez (mount).
+  // El signal cambia cuando OTRA pantalla (historias/reels, o el menú "+"
+  // del header) crea un post — así el feed se entera y se actualiza solo.
+  // También carga la primera vez (mount).
   useEffect(() => { load(); }, [refreshSignal]);
 
   // Esconde el cuadro de "publicar" al bajar en el feed (para que no tape
@@ -89,58 +79,9 @@ export default function FeedView({
     return () => el.removeEventListener('scroll', onScroll);
   }, [scrollContainerRef]);
 
-  function handlePickPhoto(file) {
-    if (!file.type.startsWith('image/')) {
-      showToast('Ese archivo no es una imagen');
-      return;
-    }
-    // Antes de subirla, dejamos que la acomode dentro del marco (recorte)
-    // para que vea exactamente cómo va a quedar en el feed.
-    setCropFile(file);
-  }
-
-  function handlePickerSelect(file, destination) {
-    setPickerOpen(false);
-    if (destination === 'post') {
-      handlePickPhoto(file);
-    } else {
-      setCrossPost({ kind: destination, file });
-    }
-  }
-
-  function handleCrossPostDone(kind) {
-    setCrossPost(null);
-    if (kind === 'story') onCreatedStory?.();
-    if (kind === 'reel') onCreatedReel?.();
-  }
-
-  function handleCropConfirm(croppedFile) {
-    setPhotoFile(croppedFile);
-    setPhotoPreview(URL.createObjectURL(croppedFile));
-    setCropFile(null);
-  }
-
-  function clearPhoto() {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  }
-
-  async function handlePost() {
-    // El texto ya no es obligatorio — alcanza con tener foto o texto (o
-    // ambos), pero no publicar completamente vacío.
-    if (!caption.trim() && !photoFile) return;
-    setPosting(true);
-    try {
-      await api.createPost({ caption, photoFile });
-      setCaption('');
-      clearPhoto();
-      showToast('¡Publicado en el feed!');
-      await load();
-    } catch (err) {
-      showToast(err.message);
-    } finally {
-      setPosting(false);
-    }
+  function handlePosted() {
+    setComposerOpen(false);
+    load();
   }
 
   async function handleLike(postId) {
@@ -206,185 +147,148 @@ export default function FeedView({
     : posts;
 
   return (
-    <section>
-      <div className={`compose ${composeHidden ? 'hidden' : ''}`}>
-        <div className="compose-row compose-row-text">
-          <input
-            type="text"
-            placeholder="¿Qué está haciendo tu mascota hoy?"
-            maxLength={140}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handlePost(); }}
-          />
-        </div>
-        <div className="compose-row compose-row-actions">
-          <button type="button" className="photo-btn" title="Foto" onClick={() => setPickerOpen(true)}>
-            <IconCamera size={18} />
-          </button>
-          <button disabled={(!caption.trim() && !photoFile) || posting} onClick={handlePost}>
-            {posting ? 'Publicando…' : 'Publicar'}
-          </button>
-        </div>
-        {photoPreview && (
-          <div className="photo-preview">
-            <img src={photoPreview} alt="Foto a publicar" />
-            <button type="button" onClick={clearPhoto}>Quitar foto</button>
-          </div>
+    <>
+      <button
+        type="button"
+        className={`compose compose-trigger ${composeHidden ? 'hidden' : ''}`}
+        onClick={() => setComposerOpen(true)}
+      >
+        <PetAvatar photoUrl={me?.pet?.photo_url} species={me?.pet?.species} color={me?.pet?.color} size={36} />
+        <span className="compose-trigger-text">¿Qué está haciendo tu mascota hoy?</span>
+        <span className="compose-trigger-camera"><IconCamera size={18} /></span>
+      </button>
+
+      <section className="feed-posts">
+        {loading && <div className="section-title">Cargando feed…</div>}
+        {!loading && q && visiblePosts.length === 0 && (
+          <div className="section-title">Sin resultados para "{searchQuery}"</div>
         )}
-      </div>
 
-      {loading && <div className="section-title">Cargando feed…</div>}
-      {!loading && q && visiblePosts.length === 0 && (
-        <div className="section-title">Sin resultados para "{searchQuery}"</div>
-      )}
-
-      {visiblePosts.map((post) => (
-        <div className="post" key={post.id}>
-          <div className="post-head">
-            <button className="post-head-link" onClick={() => onViewPet?.(post.pet_id)}>
-              <PetAvatar photoUrl={post.pet_photo_url} species={post.species} color={post.color} size={40} />
-              <div>
-                <div className="post-name">{post.pet_name}</div>
-                <div className="post-meta">{post.breed} · {timeAgo(post.created_at)}</div>
+        {visiblePosts.map((post) => (
+          <div className="post" key={post.id}>
+            <div className="post-head">
+              <button className="post-head-link" onClick={() => onViewPet?.(post.pet_id)}>
+                <PetAvatar photoUrl={post.pet_photo_url} species={post.species} color={post.color} size={40} />
+                <div>
+                  <div className="post-name">{post.pet_name}</div>
+                  <div className="post-meta">{post.breed} · {timeAgo(post.created_at)}</div>
+                </div>
+              </button>
+              {post.is_mine ? (
+                <PostMenu
+                  commentsDisabled={post.comments_disabled}
+                  onDelete={() => handleDeletePost(post.id)}
+                  onToggleComments={() => handleToggleComments(post.id)}
+                />
+              ) : (
+                <div className="post-menu">
+                  <button
+                    type="button"
+                    className="post-menu-btn"
+                    aria-label="Más opciones"
+                    onClick={() => setOpenMenuPostId((v) => (v === post.id ? null : post.id))}
+                  >
+                    ⋮
+                  </button>
+                  {openMenuPostId === post.id && (
+                    <div className="post-menu-dropdown">
+                      <button type="button" onClick={() => { setOpenMenuPostId(null); setReportPostId(post.id); }}>
+                        <IconFlag size={15} /> Reportar publicación
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {!post.shared_post_id && (
+              <div className="post-media" style={{ background: post.color }}>
+                {post.image_url
+                  ? <img className="post-photo" src={post.image_url} alt={post.caption} />
+                  : post.pet_photo_url
+                    ? <img className="post-photo" src={post.pet_photo_url} alt={post.caption} />
+                    : <PetIllustration species={post.species} size={96} />}
               </div>
-            </button>
-            {post.is_mine ? (
-              <PostMenu
-                commentsDisabled={post.comments_disabled}
-                onDelete={() => handleDeletePost(post.id)}
-                onToggleComments={() => handleToggleComments(post.id)}
-              />
-            ) : (
-              <div className="post-menu">
-                <button
-                  type="button"
-                  className="post-menu-btn"
-                  aria-label="Más opciones"
-                  onClick={() => setOpenMenuPostId((v) => (v === post.id ? null : post.id))}
-                >
-                  ⋮
-                </button>
-                {openMenuPostId === post.id && (
-                  <div className="post-menu-dropdown">
-                    <button type="button" onClick={() => { setOpenMenuPostId(null); setReportPostId(post.id); }}>
-                      <IconFlag size={15} /> Reportar publicación
-                    </button>
-                  </div>
+            )}
+            {post.caption && <div className="post-body">{post.caption}</div>}
+            {post.shared_post_id && (
+              <div className="shared-embed">
+                {post.shared_pet_name ? (
+                  <>
+                    <div className="shared-embed-head">
+                      <div className="avatar" style={{ width: 28, height: 28, background: post.shared_color }}>
+                        <PetIllustration species={post.shared_species} size={18} />
+                      </div>
+                      <span className="shared-embed-name">{post.shared_pet_name}</span>
+                    </div>
+                    {post.shared_image_url && <img className="shared-embed-photo" src={post.shared_image_url} alt="" />}
+                    {post.shared_caption && <div className="shared-embed-caption">{post.shared_caption}</div>}
+                  </>
+                ) : (
+                  <div className="shared-embed-caption">Esta publicación ya no está disponible.</div>
                 )}
               </div>
             )}
-          </div>
-          {!post.shared_post_id && (
-            <div className="post-media" style={{ background: post.color }}>
-              {post.image_url
-                ? <img className="post-photo" src={post.image_url} alt={post.caption} />
-                : post.pet_photo_url
-                  ? <img className="post-photo" src={post.pet_photo_url} alt={post.caption} />
-                  : <PetIllustration species={post.species} size={96} />}
-            </div>
-          )}
-          {post.caption && <div className="post-body">{post.caption}</div>}
-          {post.shared_post_id && (
-            <div className="shared-embed">
-              {post.shared_pet_name ? (
-                <>
-                  <div className="shared-embed-head">
-                    <div className="avatar" style={{ width: 28, height: 28, background: post.shared_color }}>
-                      <PetIllustration species={post.shared_species} size={18} />
-                    </div>
-                    <span className="shared-embed-name">{post.shared_pet_name}</span>
-                  </div>
-                  {post.shared_image_url && <img className="shared-embed-photo" src={post.shared_image_url} alt="" />}
-                  {post.shared_caption && <div className="shared-embed-caption">{post.shared_caption}</div>}
-                </>
-              ) : (
-                <div className="shared-embed-caption">Esta publicación ya no está disponible.</div>
-              )}
-            </div>
-          )}
-          <div className="post-actions">
-            <button className={`action ${post.liked_by_me ? 'liked' : ''}`} onClick={() => handleLike(post.id)}>
-              <IconHeart filled={post.liked_by_me} size={18} /> <span>{post.likes_count}</span>
-            </button>
-            <CommentSection
-              postId={post.id}
-              commentsCount={post.comments_count || 0}
-              disabled={post.comments_disabled}
-              isPostOwner={post.is_mine}
-              showToast={showToast}
-              onCountChange={handleCommentCountChange}
-            />
-            <button className="action" onClick={() => { setShareModalPostId(post.id); setShareCaption(''); }}>
-              <IconShare size={18} /> <span>Compartir</span>
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {shareModalPostId !== null && createPortal(
-        <div className="modal-backdrop" onClick={() => !sharing && setShareModalPostId(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">Compartir publicación</div>
-            <input
-              type="text"
-              className="modal-text-input"
-              placeholder="Agrega un comentario (opcional)"
-              maxLength={140}
-              value={shareCaption}
-              onChange={(e) => setShareCaption(e.target.value)}
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button className="modal-btn-secondary" onClick={() => setShareModalPostId(null)} disabled={sharing}>Cancelar</button>
-              <button className="modal-btn-primary" onClick={handleShare} disabled={sharing}>
-                {sharing ? 'Compartiendo…' : 'Compartir'}
+            <div className="post-actions">
+              <button className={`action ${post.liked_by_me ? 'liked' : ''}`} onClick={() => handleLike(post.id)}>
+                <IconHeart filled={post.liked_by_me} size={22} /> <span>{post.likes_count}</span>
+              </button>
+              <CommentSection
+                postId={post.id}
+                commentsCount={post.comments_count || 0}
+                disabled={post.comments_disabled}
+                isPostOwner={post.is_mine}
+                showToast={showToast}
+                onCountChange={handleCommentCountChange}
+              />
+              <button className="action" onClick={() => { setShareModalPostId(post.id); setShareCaption(''); }}>
+                <IconShare size={22} /> <span>Compartir</span>
               </button>
             </div>
           </div>
-        </div>,
-        document.body
-      )}
+        ))}
 
-      {pickerOpen && (
-        <MediaPickerModal
-          destination="post"
-          allowedDestinations={['post', 'story', 'reel']}
-          onSelect={handlePickerSelect}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
+        {shareModalPostId !== null && createPortal(
+          <div className="modal-backdrop" onClick={() => !sharing && setShareModalPostId(null)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-title">Compartir publicación</div>
+              <input
+                type="text"
+                className="modal-text-input"
+                placeholder="Agrega un comentario (opcional)"
+                maxLength={140}
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value)}
+                autoFocus
+              />
+              <div className="modal-actions">
+                <button className="modal-btn-secondary" onClick={() => setShareModalPostId(null)} disabled={sharing}>Cancelar</button>
+                <button className="modal-btn-primary" onClick={handleShare} disabled={sharing}>
+                  {sharing ? 'Compartiendo…' : 'Compartir'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
-      {crossPost && (
-        <CrossPostFlow
-          kind={crossPost.kind}
-          file={crossPost.file}
-          showToast={showToast}
-          onCancel={() => setCrossPost(null)}
-          onDone={handleCrossPostDone}
-        />
-      )}
-
-      {cropFile && (
-        <ErrorBoundary onReset={() => setCropFile(null)} label="feed-cropper">
-          <ImageCropper
-            file={cropFile}
-            aspect={4 / 3}
-            title="Acomodá la foto de tu publicación"
-            onConfirm={handleCropConfirm}
-            onCancel={() => setCropFile(null)}
+        {reportPostId !== null && (
+          <ReportModal
+            targetType="post"
+            targetId={reportPostId}
+            onClose={() => setReportPostId(null)}
+            showToast={showToast}
           />
-        </ErrorBoundary>
-      )}
+        )}
+      </section>
 
-      {reportPostId !== null && (
-        <ReportModal
-          targetType="post"
-          targetId={reportPostId}
-          onClose={() => setReportPostId(null)}
+      {composerOpen && (
+        <NewPostComposer
+          me={me}
+          onClose={() => setComposerOpen(false)}
+          onPosted={handlePosted}
           showToast={showToast}
         />
       )}
-    </section>
+    </>
   );
 }

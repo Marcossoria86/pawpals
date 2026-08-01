@@ -64,7 +64,16 @@ html,body{
 body{
   margin:0;
   font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--page-bg);
+  /* Antes esto era --page-bg (un gris más oscuro, pensado sólo para la
+     franja que rodea la "tarjeta" de la app en pantallas anchas — ver
+     @media (min-width:768px) en App.css). En el celular, .phone ocupa toda
+     la pantalla y no debería asomar nada del body detrás — pero por un
+     redondeo de alto (100dvh vs. la franja del home indicator en iOS
+     instalado como PWA) a veces queda una tira visible abajo del todo. Con
+     el body del mismo color que la barra de navegación (var(--card)) esa
+     tira, si aparece, queda invisible en vez de una franja gris que "roba"
+     espacio como reportó el usuario. */
+  background: var(--card);
   color: var(--ink);
 }
 /* Fredoka viene en pesos 400/500/600/700 — mapeamos los "bold" del navegador
