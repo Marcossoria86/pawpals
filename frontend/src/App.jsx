@@ -103,16 +103,47 @@ function App() {
   // siempre. Con un callback ref, React lo llama SOLO cuando el <nav> de
   // verdad se monta (recién logueado), así que ahí sí mide el alto real.
   const navObserverRef = useRef(null);
+  // navRef mide el alto real del nav varias veces por las dudas, no sólo
+  // una vez al montar: en un iPhone real (a diferencia de acá, donde
+  // probamos todo en una compu) el ResizeObserver puede quedar corriendo
+  // ANTES de que termine de cargar la tipografía/los íconos, o antes de
+  // que iOS termine de acomodar el área segura de abajo tras instalar la
+  // PWA — si esa primera medición sale un poco chica o un poco grande y
+  // después nadie la vuelve a corregir, queda un desfasaje fijo para
+  // siempre entre el padding reservado y el alto real de la barra (que es
+  // justo la franja gris que se sigue reportando). Con estas mediciones
+  // de respaldo (un cuadro después, cuando termina de cargar la
+  // tipografía, y al volver de segundo plano) nos aseguramos de que se
+  // corrija sola incluso si la primera medición estuvo mal.
+  const navMeasureCleanupRef = useRef(null);
   const navRef = useCallback((el) => {
     if (navObserverRef.current) {
       navObserverRef.current.disconnect();
       navObserverRef.current = null;
+    }
+    if (navMeasureCleanupRef.current) {
+      navMeasureCleanupRef.current();
+      navMeasureCleanupRef.current = null;
     }
     if (!el) return;
     function measure() {
       document.documentElement.style.setProperty('--navbar-h', `${el.offsetHeight}px`);
     }
     measure();
+    requestAnimationFrame(measure);
+    const t1 = setTimeout(measure, 300);
+    const t2 = setTimeout(measure, 1200);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+    document.addEventListener('visibilitychange', measure);
+    window.addEventListener('pageshow', measure);
+    navMeasureCleanupRef.current = () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      document.removeEventListener('visibilitychange', measure);
+      window.removeEventListener('pageshow', measure);
+    };
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(measure);
       observer.observe(el);
