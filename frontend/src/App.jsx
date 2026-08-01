@@ -94,8 +94,31 @@ function App() {
     return saved === 'light' || saved === 'dark' ? saved : 'system';
   });
   const mainRef = useRef(null);
-  const navRef = useRef(null);
   const lastScrollTopRef = useRef(0);
+  // navRef es un "callback ref" (no un useRef normal) a propósito: <nav>
+  // sólo existe en el DOM una vez autenticado, así que un useEffect común
+  // con [] como dependencias correría en el primer render de App (cuando
+  // todavía se está mostrando el login y navRef.current es null) y nunca
+  // se volvería a ejecutar después — quedaría midiendo "nada" para
+  // siempre. Con un callback ref, React lo llama SOLO cuando el <nav> de
+  // verdad se monta (recién logueado), así que ahí sí mide el alto real.
+  const navObserverRef = useRef(null);
+  const navRef = useCallback((el) => {
+    if (navObserverRef.current) {
+      navObserverRef.current.disconnect();
+      navObserverRef.current = null;
+    }
+    if (!el) return;
+    function measure() {
+      document.documentElement.style.setProperty('--navbar-h', `${el.offsetHeight}px`);
+    }
+    measure();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      navObserverRef.current = observer;
+    }
+  }, []);
 
   // Se engancha en <main> con onScrollCapture (fase de "captura"), que sí
   // detecta el scroll de contenedores internos (como el feed vertical de

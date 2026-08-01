@@ -182,13 +182,19 @@ main{
   -webkit-overflow-scrolling:touch;
   /* Este hueco de abajo existe SÓLO para que la barra de navegación fija no
      tape el último post cuando está visible — por eso su tamaño tiene que
-     coincidir con el alto real de esa barra (icono + su propio padding +
-     el margen de seguridad del iPhone, ver nav.tabbar más abajo). Cuando la
-     barra está ESCONDIDA (ver main.main-tabbar-hidden) este hueco pasa a
-     sobrar del todo: no hay nada que tapar, así que se achica a casi nada
-     para que el feed llegue de verdad hasta el borde de la pantalla, sin
-     ninguna franja — es lo que se pidió explícitamente. */
-  padding: 12px 16px calc(90px + env(safe-area-inset-bottom));
+     coincidir EXACTO con el alto real de esa barra. Antes era un número
+     fijo a ojo (90px + margen de seguridad) que no siempre coincidía con
+     el alto real del nav en cada iPhone (el margen de seguridad de abajo
+     varía de un modelo a otro) — si el nav terminaba más bajo que este
+     padding, sobraba un resto sin tapar que se veía como franja. Ahora usa
+     --navbar-h, el alto REAL del nav medido con JS (ver el useEffect con
+     ResizeObserver en App.jsx) — quedan siempre calzados exacto. El
+     calc(...) de respaldo es sólo por si ese JS todavía no corrió. Cuando
+     la barra está ESCONDIDA (ver main.main-tabbar-hidden) este hueco pasa
+     a sobrar del todo: no hay nada que tapar, así que se achica a casi
+     nada para que el feed llegue de verdad hasta el borde de la pantalla,
+     sin ninguna franja — es lo que se pidió explícitamente. */
+  padding: 12px 16px var(--navbar-h, calc(90px + env(safe-area-inset-bottom)));
   transition: padding-bottom .22s ease;
   text-align:left;
   width:100%;
@@ -1582,7 +1588,7 @@ main.no-pad{ padding:0; }
 /* Mismo ajuste que en main{} de más arriba, y por la misma razón (esta
    lista tiene su propio scroll propio con overflow-y, no usa el padding de
    main). */
-.messages-list-pad{ padding:12px 16px calc(90px + env(safe-area-inset-bottom)); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
+.messages-list-pad{ padding:12px 16px var(--navbar-h, calc(90px + env(safe-area-inset-bottom))); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
 main.main-tabbar-hidden .messages-list-pad{ padding-bottom: 4px; }
 .conversation-row{
   width:100%;
