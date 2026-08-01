@@ -110,7 +110,12 @@ header.appbar{
 .header-plus-dropdown{
   position:absolute;
   top:calc(100% + 6px);
-  left:0;
+  /* Antes esto era left:0, que abre el menú hacia la DERECHA desde el botón
+     "+" — pero el "+" vive pegado al borde derecho del header, así que el
+     menú (190px de ancho mínimo) se salía de la pantalla por ese lado. Con
+     right:0 abre hacia la IZQUIERDA en cambio, siempre con lugar de sobra
+     porque ahí está el resto del header. */
+  right:0;
   background:var(--card);
   border:1px solid var(--line);
   border-radius:14px;
@@ -157,20 +162,21 @@ main{
   min-height:0;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
-  /* Antes esto era un 90px fijo, calculado para alcanzar SÓLO en el
-     navegador (donde env(safe-area-inset-bottom) vale 0). nav.tabbar de
-     abajo sí suma ese valor a su propio padding (ver más abajo), así que
-     cuando la app corre instalada como PWA en un iPhone con muesca/Face ID
-     (donde esa franja segura es real, ~34px) la barra de navegación crece
-     esos 34px pero el hueco que le reservábamos acá abajo no — el resultado
-     es que la barra termina tapando esos últimos ~34px del feed, que es
-     justo el bug de "la barra de abajo tapa contenido, pero sólo en la app
-     anclada a inicio" que se reportó varias veces (en el navegador, con esa
-     franja en 0, nunca se notaba). Sumando el mismo env(...) acá, el hueco
-     reservado crece exactamente lo mismo que crece la barra real. */
+  /* Este hueco de abajo existe SÓLO para que la barra de navegación fija no
+     tape el último post cuando está visible — por eso su tamaño tiene que
+     coincidir con el alto real de esa barra (icono + su propio padding +
+     el margen de seguridad del iPhone, ver nav.tabbar más abajo). Cuando la
+     barra está ESCONDIDA (ver main.main-tabbar-hidden) este hueco pasa a
+     sobrar del todo: no hay nada que tapar, así que se achica a casi nada
+     para que el feed llegue de verdad hasta el borde de la pantalla, sin
+     ninguna franja — es lo que se pidió explícitamente. */
   padding: 12px 16px calc(90px + env(safe-area-inset-bottom));
+  transition: padding-bottom .22s ease;
   text-align:left;
   width:100%;
+}
+main:not(.no-pad).main-tabbar-hidden{
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
 
 
@@ -693,7 +699,12 @@ main{
   cursor:pointer;
   text-align:left;
   min-width:0;
-  flex:1;
+  /* Antes esto tenía flex:1, que estira el BOTÓN (no sólo la foto+nombre)
+     hasta ocupar todo el ancho libre de la fila — así que tocar el espacio
+     vacío entre el nombre y el botón ⋮ de la esquina también contaba como
+     "tocar el nombre" y mandaba al perfil. Sin flex:1 el botón mide sólo lo
+     que ocupan la foto y el texto, así que sólo eso es tocable. */
+  max-width:100%;
 }
 .post-head-link:hover .post-name{
   text-decoration:underline;
@@ -943,18 +954,23 @@ main{
    fondo liso con el botón para agregar una encima; una vez que hay foto, el
    mismo botón cambia a "Cambiar portada". En el perfil de OTRAS mascotas
    (PetProfileView) no se agrega el botón — ver .profile-cover-readonly. */
+/* La portada ahora vive DENTRO de la misma tarjeta que el avatar (antes
+   estaba en su propia tarjeta separada arriba — el usuario pidió que fuera
+   "detrás" del avatar, estilo Facebook). Por eso .profile-cover es
+   position:absolute pegada al borde de arriba de .profile-hero (que tiene
+   overflow:hidden para que sus esquinas cuadradas no sobresalgan de las
+   esquinas redondeadas de la tarjeta), y .profile-avatar-wrap se empuja
+   hacia abajo con margin-top para que sólo la mitad de abajo del avatar
+   quede pisando el borde inferior de la portada. */
 .profile-cover{
-  position:relative;
-  height:140px;
-  border-radius:var(--radius);
+  position:absolute;
+  top:0; left:0; right:0;
+  height:110px;
   background:var(--brand-soft) center/cover no-repeat;
-  border:1px solid var(--line);
-  margin-bottom:16px;
   display:flex;
   align-items:flex-end;
   justify-content:flex-end;
 }
-.profile-cover-readonly{ margin-bottom:16px; }
 .profile-cover-btn{
   margin:10px;
   display:flex;
@@ -979,6 +995,7 @@ main{
   padding:20px 16px;
   text-align:center;
   margin-bottom:16px;
+  overflow:hidden;
 }
 .profile-settings-btn{
   position:absolute;
@@ -987,21 +1004,37 @@ main{
   width:32px;
   height:32px;
   border-radius:50%;
-  background:var(--bg);
-  color:var(--ink-soft);
-  border:1px solid var(--line);
+  /* Antes era gris clarito (var(--bg)) — apenas se veía apoyado sobre la
+     foto de portada, que ahora pasa justo por detrás de este botón. Con un
+     fondo oscuro traslúcido y el ícono en blanco se lee bien sin importar
+     qué haya de fondo (una foto, o el color liso de siempre si todavía no
+     hay portada). */
+  background:rgba(20,22,26,0.55);
+  color:#fff;
+  border:none;
   display:flex;
   align-items:center;
   justify-content:center;
   cursor:pointer;
+  z-index:2;
 }
 .profile-avatar-wrap{
   position:relative;
   width:84px;
   margin: 0 auto 10px;
+  z-index:2;
 }
+/* Empuja el avatar hacia abajo para que sólo la mitad de abajo quede
+   pisando el borde inferior de la portada (ver .profile-cover, arriba) —
+   compartido por el propio perfil (adentro de .profile-avatar-wrap) y el
+   perfil de otras mascotas (sin ese wrapper), así que va en esta clase, que
+   está en los dos casos. También le suma un borde del color de la tarjeta
+   para que se note recortado sobre la foto de portada. */
 .profile-avatar{
-  margin:0;
+  margin: 62px auto 10px;
+  border: 4px solid var(--card);
+  z-index:2;
+  position:relative;
 }
 .profile-photo-btn{
   position:absolute;
@@ -1504,7 +1537,8 @@ main.no-pad{ padding:0; }
 /* Mismo ajuste que en main{} de más arriba, y por la misma razón (esta
    lista tiene su propio scroll propio con overflow-y, no usa el padding de
    main). */
-.messages-list-pad{ padding:12px 16px calc(90px + env(safe-area-inset-bottom)); height:100%; overflow-y:auto; }
+.messages-list-pad{ padding:12px 16px calc(90px + env(safe-area-inset-bottom)); height:100%; overflow-y:auto; transition: padding-bottom .22s ease; }
+main.main-tabbar-hidden .messages-list-pad{ padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .conversation-row{
   width:100%;
   display:flex;
@@ -1758,6 +1792,105 @@ main.no-pad{ padding:0; }
   border-color:var(--accent);
   color:#fff;
 }
+.side-menu-chevron{ transition: transform .15s ease; }
+.side-menu-chevron.open{ transform:rotate(90deg); }
+.side-menu-collapsible-body{
+  padding-left:6px;
+  border-left:2px solid var(--line);
+  margin:2px 0 6px 15px;
+}
+.side-menu-subrow{ padding:10px 4px; font-size:13px; }
+/* Filas que todavía no son una funcionalidad real (ver ComingSoonRow en
+   SideMenu.jsx) — se ven, pero atenuadas y sin cursor de "tocable", con una
+   píldora chiquita en vez de simular que hacen algo al tocarlas. */
+.side-menu-row-disabled{
+  opacity:0.55;
+  cursor:default;
+}
+.side-menu-soon-badge{
+  margin-left:auto;
+  font-size:10.5px;
+  font-weight:700;
+  color:var(--ink-soft);
+  background:var(--chip-bg);
+  padding:3px 8px;
+  border-radius:999px;
+}
+.side-menu-legal-choices{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:2px 4px 10px 33px;
+}
+.side-menu-legal-choices button{
+  background:none;
+  border:none;
+  color:var(--accent);
+  font-family:inherit;
+  font-size:12.5px;
+  font-weight:600;
+  text-align:left;
+  padding:4px 0;
+  cursor:pointer;
+}
+
+/* ---------- Avatares (fondo + accesorio personalizados) ---------- */
+.avatar-picker-card{ max-width:380px; }
+.avatar-picker-preview{
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  margin:4px auto 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.avatar-picker-bg-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:8px 0 16px;
+}
+.avatar-picker-swatch{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:2px solid transparent;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  cursor:pointer;
+}
+.avatar-picker-swatch.selected{ border-color:var(--ink); }
+.avatar-picker-accessory-row{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+  margin:8px 0 18px;
+}
+.avatar-picker-accessory{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:5px;
+  padding:8px 4px;
+  border-radius:14px;
+  border:2px solid var(--line);
+  background:var(--surface-alt);
+  cursor:pointer;
+  font-family:inherit;
+}
+.avatar-picker-accessory.selected{ border-color:var(--accent); }
+.avatar-picker-accessory-preview{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.avatar-picker-accessory span{ font-size:11px; color:var(--ink-soft); font-weight:600; }
 
 .follow-list-card{ max-height:70vh; display:flex; flex-direction:column; }
 .follow-list{ overflow-y:auto; }

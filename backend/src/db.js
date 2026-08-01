@@ -187,6 +187,12 @@ ensureColumn('notifications', 'story_id', 'INTEGER');
 // Foto de portada del perfil (estilo Facebook), separada de la foto de
 // perfil (photo_path) — se ve como fondo grande arriba del avatar.
 ensureColumn('pets', 'cover_path', 'TEXT');
+// Avatar personalizado (ver AvatarPicker, "Avatares" del menú) — un fondo de
+// color y un accesorio elegidos entre opciones fijas (ver AVATAR_ACCESSORIES
+// y AVATAR_BACKGROUNDS en PetIllustration.jsx), independientes de la foto
+// real. Se usan sólo cuando la mascota no tiene photo_path (ver PetAvatar).
+ensureColumn('pets', 'avatar_bg', 'TEXT');
+ensureColumn('pets', 'avatar_accessory', 'TEXT');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

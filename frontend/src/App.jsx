@@ -17,22 +17,22 @@ import NewPostComposer from './NewPostComposer';
 import MediaPickerModal from './MediaPickerModal';
 import CrossPostFlow from './CrossPostFlow';
 import SideMenu from './SideMenu';
-import { IconHome, IconReels, IconRequests, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
-import { IconSearch, IconClose, IconPawPair, IconPlus, IconGallery, IconCamera, IconMenu } from './Icons';
+import { IconHome, IconReels, IconNearby, IconBell, IconProfile, IconMessages } from './NavIcons';
+import { IconSearch, IconClose, IconPawPair, IconPlus, IconGallery, IconCamera, IconMenu, IconPawSmall } from './Icons';
 
 // Barra inferior estilo Facebook: Feed, Reels, Solicitudes (citas de juego
 // pendientes de aceptar/rechazar), Cerca de ti (ocupa el lugar que en
 // Facebook sería Marketplace), Notificaciones y Mi perfil. Los íconos son
 // dibujos propios (NavIcons.jsx), no emojis.
 //
-// El ícono de "Solicitudes" (una huella hecha de varias formas finitas) se
-// ve más chico que sus vecinos (un solo trazo grueso) aunque compartan el
-// mismo tamaño base — por eso acá se lo agranda un poco a mano (30 en vez
-// de 25) para que se vea parejo con el resto a simple vista.
+// El ícono de "Solicitudes" (citas de juego) ahora es una de las patitas
+// del logo (IconPawSmall, la misma huella rellena que ya se usaba en el
+// header/login) en vez del ícono de tres circulitos+óvalo que tenía antes —
+// así queda visualmente conectado con la identidad de la marca.
 const TABS = [
   { key: 'feed', label: 'Feed', icon: <IconHome /> },
   { key: 'reels', label: 'Reels', icon: <IconReels /> },
-  { key: 'requests', label: 'Solicitudes', icon: <IconRequests size={30} /> },
+  { key: 'requests', label: 'Solicitudes', icon: <IconPawSmall size={26} /> },
   { key: 'nearby', label: 'Cerca de ti', icon: <IconNearby /> },
   { key: 'notifications', label: 'Notificaciones', icon: <IconBell /> },
   { key: 'profile', label: 'Mi perfil', icon: <IconProfile /> }
@@ -87,6 +87,7 @@ function App() {
   const [plusPostOpen, setPlusPostOpen] = useState(false);
   const [plusPickerDest, setPlusPickerDest] = useState(null); // 'story' | 'reel'
   const [plusCrossPost, setPlusCrossPost] = useState(null); // { kind, file }
+  const plusWrapRef = useRef(null);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem(THEME_KEY);
@@ -163,6 +164,7 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+    setPlusMenuOpen(false);
     // selectTab es la navegación "normal" (tabs de abajo, ícono de mensajes
     // del header): siempre entra a la bandeja por la lista. Sólo
     // goToMessages (desde "Enviar mensaje" en un perfil) abre directo una
@@ -180,6 +182,7 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+    setPlusMenuOpen(false);
     setMessagesInitialPetId(null);
     setTab('feed');
     lastScrollTopRef.current = 0;
@@ -190,6 +193,22 @@ function App() {
   }
 
   useEffect(() => { applyTheme(theme); }, [theme]);
+
+  // El menú del "+" (Publicación/Historia/Reel) se quedaba abierto sin
+  // importar qué otra cosa se tocara después — ahora cualquier toque FUERA
+  // del botón/menú lo cierra solo (sin bloquear ese toque: sólo escuchamos,
+  // no interceptamos el click, así que si lo que tocaste era, por ejemplo,
+  // otra pestaña, esa pestaña igual se abre normalmente Y el menú se cierra).
+  useEffect(() => {
+    if (!plusMenuOpen) return undefined;
+    function handlePointerDown(e) {
+      if (plusWrapRef.current && !plusWrapRef.current.contains(e.target)) {
+        setPlusMenuOpen(false);
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [plusMenuOpen]);
 
   function handleThemeChange(next) {
     setTheme(next);
@@ -223,6 +242,7 @@ function App() {
     setViewingPetId(null);
     setSearchOpen(false);
     setSearchQuery('');
+    setPlusMenuOpen(false);
     setTab('messages');
     setMessagesInitialPetId(petId);
     lastScrollTopRef.current = 0;
@@ -305,7 +325,7 @@ function App() {
               pegado contra el borde derecho. Por eso se esconde en esta
               pestaña. */}
           {!searchOpen && tab !== 'messages' && (
-            <div className="header-plus-wrap">
+            <div className="header-plus-wrap" ref={plusWrapRef}>
               <button
                 type="button"
                 className="icon-btn"
@@ -347,6 +367,7 @@ function App() {
           onClose={() => setSideMenuOpen(false)}
           onLogout={() => { setSideMenuOpen(false); setAuthenticated(false); }}
           onViewProfile={() => { setSideMenuOpen(false); selectTab('profile'); }}
+          onViewPet={(id) => { setSideMenuOpen(false); setViewingPetId(id); }}
           showToast={showToast}
           theme={theme}
           onThemeChange={handleThemeChange}
@@ -355,7 +376,18 @@ function App() {
 
       <main
         ref={mainRef}
-        className={tab === 'reels' || tab === 'messages' ? 'no-pad' : ''}
+        className={[
+          tab === 'reels' || tab === 'messages' ? 'no-pad' : '',
+          // El hueco reservado abajo del feed sólo hace falta mientras la
+          // barra de navegación está VISIBLE (para no taparla) — apenas se
+          // esconde al bajar, ese hueco ya no debería existir (así el
+          // contenido llega de verdad hasta el borde de la pantalla, como
+          // pidió el usuario). Antes el hueco era siempre el mismo tamaño
+          // sin importar si la barra estaba escondida o no, lo que dejaba
+          // una franja en blanco fija ahí abajo. Ver main.main-tabbar-hidden
+          // en App.css.
+          tabbarHidden ? 'main-tabbar-hidden' : ''
+        ].filter(Boolean).join(' ')}
         onScrollCapture={handleScrollCapture}
       >
         {viewingPetId ? (

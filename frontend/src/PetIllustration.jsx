@@ -99,11 +99,80 @@ function Turtle() {
 
 const COMPONENTS = { dog: Dog, cat: Cat, rabbit: Rabbit, bird: Bird, turtle: Turtle };
 
-export default function PetIllustration({ species, size = 40 }) {
+// Accesorios del "avatar personalizado" (ver AvatarPicker) — formas propias
+// y simples, sólo INSPIRADAS en la idea de avatares con accesorios tipo
+// Duolingo (personalización divertida), no copias de sus personajes. Se
+// dibujan en el mismo viewBox 0-0-64-64 que las ilustraciones de especie de
+// arriba, así quedan alineados sin importar qué especie tengan debajo.
+export const AVATAR_ACCESSORIES = [
+  { key: 'none', label: 'Ninguno' },
+  { key: 'cap', label: 'Gorra' },
+  { key: 'glasses', label: 'Anteojos' },
+  { key: 'bow', label: 'Moño' },
+  { key: 'bandana', label: 'Pañuelo' },
+  { key: 'crown', label: 'Corona' }
+];
+
+export const AVATAR_BACKGROUNDS = ['#8ce99a', '#63e6be', '#66d9e8', '#74c0fc', '#b197fc', '#ffa8a8', '#ffd43b', '#ffc078'];
+
+function AccessoryOverlay({ accessory }) {
+  if (accessory === 'cap') {
+    return (
+      <g>
+        <path d="M14 24 Q32 6 50 24 L50 28 L14 28 Z" fill="#ef6c4d" />
+        <rect x="12" y="25" width="40" height="5" rx="2.5" fill="#d9502f" />
+        <circle cx="32" cy="13" r="3" fill="#ffd166" />
+      </g>
+    );
+  }
+  if (accessory === 'glasses') {
+    return (
+      <g stroke="#2b2620" strokeWidth="2" fill="rgba(255,255,255,0.4)">
+        <circle cx="23" cy="33" r="7" />
+        <circle cx="41" cy="33" r="7" />
+        <path d="M30 32 h2" />
+        <path d="M16 31 q-4 0 -4 4" fill="none" strokeLinecap="round" />
+        <path d="M48 31 q4 0 4 4" fill="none" strokeLinecap="round" />
+      </g>
+    );
+  }
+  if (accessory === 'bow') {
+    return (
+      <g>
+        <path d="M32 46 L23 40 V52 Z" fill="#e64980" />
+        <path d="M32 46 L41 40 V52 Z" fill="#e64980" />
+        <circle cx="32" cy="46" r="3.2" fill="#c2255c" />
+      </g>
+    );
+  }
+  if (accessory === 'bandana') {
+    return (
+      <g>
+        <path d="M11 39 Q32 52 53 39 L53 45 Q32 58 11 45 Z" fill="#4c6ef5" />
+        <circle cx="20" cy="43" r="1.4" fill="#fff" />
+        <circle cx="32" cy="50" r="1.4" fill="#fff" />
+        <circle cx="44" cy="43" r="1.4" fill="#fff" />
+      </g>
+    );
+  }
+  if (accessory === 'crown') {
+    return (
+      <path d="M14 22 L20 9 L28 19 L32 7 L36 19 L44 9 L50 22 L50 28 L14 28 Z" fill="#ffd43b" stroke="#f5a623" strokeWidth="1.2" strokeLinejoin="round" />
+    );
+  }
+  return null;
+}
+
+export default function PetIllustration({ species, size = 40, accessory = 'none' }) {
   const Cmp = COMPONENTS[species] || Dog;
   return (
-    <div style={{ width: size, height: size, display: 'inline-block' }}>
+    <div style={{ width: size, height: size, display: 'inline-block', position: 'relative' }}>
       <Cmp />
+      {accessory && accessory !== 'none' && (
+        <svg viewBox="0 0 64 64" width="100%" height="100%" style={{ position: 'absolute', inset: 0 }} aria-hidden="true">
+          <AccessoryOverlay accessory={accessory} />
+        </svg>
+      )}
     </div>
   );
 }

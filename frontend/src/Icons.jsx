@@ -328,3 +328,88 @@ export function IconLogout({ size = 19 }) {
     </svg>
   );
 }
+
+// Íconos del menú lateral nuevo (Amigos, Avatares, Chatear con IA,
+// Cumpleaños, y las opciones de adentro de Configuración/Ayuda).
+export function IconUsers({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="9" cy="9" r="3.4" />
+      <path d="M2.8 19c1-3.2 3.6-4.8 6.2-4.8s5.2 1.6 6.2 4.8" />
+      <path d="M15.5 5.6a3.4 3.4 0 0 1 0 6.6" />
+      <path d="M16.8 14.4c2.2 0.4 3.9 1.9 4.6 4.6" />
+    </svg>
+  );
+}
+
+export function IconFace({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="8.9" cy="10.5" r="1" fill="currentColor" />
+      <circle cx="15.1" cy="10.5" r="1" fill="currentColor" />
+      <path d="M8.5 15c1 1 2.2 1.5 3.5 1.5s2.5-0.5 3.5-1.5" />
+    </svg>
+  );
+}
+
+export function IconSparkle({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} fill="currentColor" stroke="none" aria-hidden="true">
+      <path d="M12 3c.5 3.4 1.7 5.5 5 6-3.3.5-4.5 2.6-5 6-.5-3.4-1.7-5.5-5-6 3.3-.5 4.5-2.6 5-6Z" />
+      <path d="M19 14c.25 1.4.9 2.2 2.2 2.5-1.3.3-1.95 1.1-2.2 2.5-.25-1.4-.9-2.2-2.2-2.5 1.3-.3 1.95-1.1 2.2-2.5Z" />
+    </svg>
+  );
+}
+
+export function IconCake({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M4 20v-6.5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2V20" strokeLinejoin="round" />
+      <path d="M4 20h16" />
+      <path d="M4 16.5c1.2.8 2.2.8 3.4 0 1.2-.8 2.2-.8 3.4 0 1.2.8 2.2.8 3.4 0 1.2-.8 2.2-.8 3.4 0" />
+      <path d="M12 11.5V8" />
+      <path d="M12 8c-1.1 0-1.6-.9-1-2 .3-.5 1-1.6 1-1.6s.7 1.1 1 1.6c.6 1.1.1 2-1 2Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconGlobe({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <ellipse cx="12" cy="12" rx="3.6" ry="8.5" />
+      <path d="M3.7 9h16.6" />
+      <path d="M3.7 15h16.6" />
+    </svg>
+  );
+}
+
+export function IconAppSquare({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="5" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function IconDoc({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" strokeLinejoin="round" />
+      <path d="M14 3.5V8h4" strokeLinejoin="round" />
+      <path d="M8.5 12.5h7" />
+      <path d="M8.5 16h7" />
+    </svg>
+  );
+}
+
+export function IconLock({ size = 19 }) {
+  return (
+    <svg {...COMMON} width={size} height={size} aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2.2" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </svg>
+  );
+}

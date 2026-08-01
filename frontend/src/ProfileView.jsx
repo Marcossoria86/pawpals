@@ -83,19 +83,19 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
 
   return (
     <section>
-      <div className="profile-cover" style={pet.cover_url ? { backgroundImage: `url(${pet.cover_url})` } : undefined}>
-        <button
-          type="button"
-          className="profile-cover-btn"
-          title="Cambiar foto de portada"
-          aria-label="Cambiar foto de portada"
-          onClick={() => setCoverPickerOpen(true)}
-          disabled={coverUploading}
-        >
-          {coverUploading ? '…' : <><IconCamera size={14} /> {pet.cover_url ? 'Cambiar portada' : 'Agregar portada'}</>}
-        </button>
-      </div>
       <div className="profile-hero">
+        <div className="profile-cover" style={pet.cover_url ? { backgroundImage: `url(${pet.cover_url})` } : undefined}>
+          <button
+            type="button"
+            className="profile-cover-btn"
+            title="Cambiar foto de portada"
+            aria-label="Cambiar foto de portada"
+            onClick={() => setCoverPickerOpen(true)}
+            disabled={coverUploading}
+          >
+            {coverUploading ? '…' : <><IconCamera size={14} /> {pet.cover_url ? 'Cambiar portada' : 'Agregar portada'}</>}
+          </button>
+        </div>
         <button
           type="button"
           className="profile-settings-btn"
@@ -106,7 +106,7 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
           <IconSettings size={18} />
         </button>
         <div className="profile-avatar-wrap">
-          <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} size={84} className="profile-avatar" />
+          <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} avatarBg={pet.avatar_bg} avatarAccessory={pet.avatar_accessory} size={84} className="profile-avatar" />
           <button
             type="button"
             className="profile-photo-btn"

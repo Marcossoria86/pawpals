@@ -524,6 +524,23 @@ app.patch('/api/pets/me/cover', requireAuth, (req, res, next) => {
   res.json({ cover_url: absoluteUploadUrl(req, req.file.filename) });
 });
 
+// Avatar personalizado ("Avatares" del menú) — fondo + accesorio elegidos
+// entre opciones fijas. Se valida contra la misma lista blanca que usa el
+// cliente (ver AVATAR_BACKGROUNDS / AVATAR_ACCESSORIES en
+// PetIllustration.jsx) para no guardar cualquier string arbitrario.
+const AVATAR_BG_WHITELIST = ['#8ce99a', '#63e6be', '#66d9e8', '#74c0fc', '#b197fc', '#ffa8a8', '#ffd43b', '#ffc078'];
+const AVATAR_ACCESSORY_WHITELIST = ['none', 'cap', 'glasses', 'bow', 'bandana', 'crown'];
+app.patch('/api/pets/me/avatar', requireAuth, (req, res) => {
+  const pet = getPetByOwner(req.userId);
+  if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
+  const { bg, accessory } = req.body || {};
+  if (!AVATAR_BG_WHITELIST.includes(bg) || !AVATAR_ACCESSORY_WHITELIST.includes(accessory)) {
+    return res.status(400).json({ error: 'Fondo o accesorio inválido' });
+  }
+  db.prepare('UPDATE pets SET avatar_bg = ?, avatar_accessory = ? WHERE id = ?').run(bg, accessory, pet.id);
+  res.json({ avatar_bg: bg, avatar_accessory: accessory });
+});
+
 // Guarda la ubicación real del dispositivo (o la reemplaza si la persona la
 // actualiza a mano desde Configuración). Los valores llegan del navegador
 // (navigator.geolocation), nunca inventados por el backend.
