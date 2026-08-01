@@ -99,7 +99,7 @@ export const api = {
     form.append('photo', photoFile);
     return request('/api/pets/me/cover', { method: 'PATCH', body: form });
   },
-  updatePetAvatar: ({ bg, accessory }) => request('/api/pets/me/avatar', { method: 'PATCH', body: JSON.stringify({ bg, accessory }) }),
+  updatePetAvatar: ({ bg, accessory, variant }) => request('/api/pets/me/avatar', { method: 'PATCH', body: JSON.stringify({ bg, accessory, variant }) }),
   sharePost: (postId, caption) => request(`/api/posts/${postId}/share`, { method: 'POST', body: JSON.stringify({ caption }) }),
 
   toggleFollow: (petId) => request(`/api/pets/${petId}/follow`, { method: 'POST' }),

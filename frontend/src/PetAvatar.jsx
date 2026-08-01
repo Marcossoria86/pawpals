@@ -2,12 +2,13 @@ import PetIllustration from './PetIllustration';
 
 // Avatar de mascota: si tiene foto real subida, la muestra; si no, cae en la
 // ilustración propia de su especie. Se usa en feed, cerca de ti, perfil y
-// comentarios. avatarBg/avatarAccessory son opcionales (ver AvatarPicker,
-// "Avatares" del menú) — si la mascota personalizó su avatar, avatarBg
-// reemplaza al color de fondo de siempre y avatarAccessory agrega el
-// accesorio elegido; si no se pasan (la mayoría de los usos todavía no los
-// manda), el avatar se ve exactamente como antes.
-export default function PetAvatar({ photoUrl, species, color, avatarBg, avatarAccessory, size = 40, className = '', style = {} }) {
+// comentarios. avatarBg/avatarAccessory/avatarVariant son opcionales (ver
+// AvatarPicker, "Avatares" del menú) — si la mascota personalizó su avatar,
+// avatarBg reemplaza al color de fondo de siempre, avatarVariant elige entre
+// los distintos "looks" de su especie y avatarAccessory agrega el accesorio
+// elegido; si no se pasan (la mayoría de los usos todavía no los manda), el
+// avatar se ve exactamente como antes (el primer look de su especie).
+export default function PetAvatar({ photoUrl, species, color, avatarBg, avatarAccessory, avatarVariant, size = 40, className = '', style = {} }) {
   return (
     <div
       className={`avatar ${className}`}
@@ -15,7 +16,7 @@ export default function PetAvatar({ photoUrl, species, color, avatarBg, avatarAc
     >
       {photoUrl
         ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <PetIllustration species={species} size={Math.round(size * 0.65)} accessory={avatarAccessory} />}
+        : <PetIllustration species={species} variant={avatarVariant} size={Math.round(size * 0.65)} accessory={avatarAccessory} />}
     </div>
   );
 }

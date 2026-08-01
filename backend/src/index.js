@@ -524,21 +524,38 @@ app.patch('/api/pets/me/cover', requireAuth, (req, res, next) => {
   res.json({ cover_url: absoluteUploadUrl(req, req.file.filename) });
 });
 
-// Avatar personalizado ("Avatares" del menú) — fondo + accesorio elegidos
-// entre opciones fijas. Se valida contra la misma lista blanca que usa el
-// cliente (ver AVATAR_BACKGROUNDS / AVATAR_ACCESSORIES en
-// PetIllustration.jsx) para no guardar cualquier string arbitrario.
+// Avatar personalizado ("Avatares" del menú) — look (variante de especie) +
+// fondo + accesorio elegidos entre opciones fijas. Se valida contra la
+// misma lista blanca que usa el cliente (ver AVATAR_BACKGROUNDS /
+// AVATAR_ACCESSORIES / AVATAR_VARIANT_KEYS en PetIllustration.jsx) para no
+// guardar cualquier string arbitrario.
 const AVATAR_BG_WHITELIST = ['#8ce99a', '#63e6be', '#66d9e8', '#74c0fc', '#b197fc', '#ffa8a8', '#ffd43b', '#ffc078'];
 const AVATAR_ACCESSORY_WHITELIST = ['none', 'cap', 'glasses', 'bow', 'bandana', 'crown'];
+const AVATAR_VARIANT_WHITELIST = [
+  'dog-1', 'dog-2', 'dog-3',
+  'cat-1', 'cat-2', 'cat-3',
+  'rabbit-1', 'rabbit-2', 'rabbit-3',
+  'bird-1', 'bird-2', 'bird-3',
+  'turtle-1', 'turtle-2', 'turtle-3'
+];
 app.patch('/api/pets/me/avatar', requireAuth, (req, res) => {
   const pet = getPetByOwner(req.userId);
   if (!pet) return res.status(404).json({ error: 'No tienes una mascota registrada' });
-  const { bg, accessory } = req.body || {};
-  if (!AVATAR_BG_WHITELIST.includes(bg) || !AVATAR_ACCESSORY_WHITELIST.includes(accessory)) {
-    return res.status(400).json({ error: 'Fondo o accesorio inválido' });
+  const { bg, accessory, variant } = req.body || {};
+  // El "look" es opcional en el body (por si en algún momento se llama a
+  // esta ruta sólo para actualizar fondo/accesorio) — si no viene, se
+  // conserva el que ya tenía guardado la mascota, o el primero de su
+  // especie si nunca eligió uno.
+  const nextVariant = variant || pet.avatar_variant || `${pet.species}-1`;
+  if (
+    !AVATAR_BG_WHITELIST.includes(bg) ||
+    !AVATAR_ACCESSORY_WHITELIST.includes(accessory) ||
+    !AVATAR_VARIANT_WHITELIST.includes(nextVariant)
+  ) {
+    return res.status(400).json({ error: 'Fondo, look o accesorio inválido' });
   }
-  db.prepare('UPDATE pets SET avatar_bg = ?, avatar_accessory = ? WHERE id = ?').run(bg, accessory, pet.id);
-  res.json({ avatar_bg: bg, avatar_accessory: accessory });
+  db.prepare('UPDATE pets SET avatar_bg = ?, avatar_accessory = ?, avatar_variant = ? WHERE id = ?').run(bg, accessory, nextVariant, pet.id);
+  res.json({ avatar_bg: bg, avatar_accessory: accessory, avatar_variant: nextVariant });
 });
 
 // Guarda la ubicación real del dispositivo (o la reemplaza si la persona la

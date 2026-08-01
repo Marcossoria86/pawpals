@@ -96,7 +96,7 @@ export default function PetProfileView({ petId, onBack, showToast, onMessagePet,
         {pet.cover_url && (
           <div className="profile-cover profile-cover-readonly" style={{ backgroundImage: `url(${pet.cover_url})` }} />
         )}
-        <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} avatarBg={pet.avatar_bg} avatarAccessory={pet.avatar_accessory} size={84} className="profile-avatar" />
+        <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} avatarBg={pet.avatar_bg} avatarAccessory={pet.avatar_accessory} avatarVariant={pet.avatar_variant} size={84} className="profile-avatar" />
         <div className="profile-name">{pet.name}</div>
         <div className="profile-sub">{pet.breed} · {pet.age ?? '?'} años · dueño/a: {owner_name}</div>
         {!is_me && distance_km != null && (

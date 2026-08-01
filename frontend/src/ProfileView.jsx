@@ -106,7 +106,7 @@ export default function ProfileView({ onLogout, showToast, onViewPet }) {
           <IconSettings size={18} />
         </button>
         <div className="profile-avatar-wrap">
-          <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} avatarBg={pet.avatar_bg} avatarAccessory={pet.avatar_accessory} size={84} className="profile-avatar" />
+          <PetAvatar photoUrl={pet.photo_url} species={pet.species} color={pet.color} avatarBg={pet.avatar_bg} avatarAccessory={pet.avatar_accessory} avatarVariant={pet.avatar_variant} size={84} className="profile-avatar" />
           <button
             type="button"
             className="profile-photo-btn"

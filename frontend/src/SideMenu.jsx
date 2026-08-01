@@ -12,11 +12,24 @@ import {
 } from './Icons';
 import { SUPPORT_EMAIL } from './config';
 
-// Fila del menú que todavía no existe como funcionalidad real (Chatear con
-// IA, Cumpleaños, Idioma, Ícono de la app) — se muestra bien visible pero
-// deshabilitada con un "Pronto" en vez de ser un botón que no hace nada al
-// tocarlo (eso sería engañoso). Ídem para la línea "Asistente de ayuda de
-// IA" adentro de Ayuda.
+const LANGUAGE_KEY = 'pawpals-language';
+
+// Ocho idiomas para elegir (ver pedido del usuario: "tal vez la peguemos en
+// otro país cuando subamos la app"). Guardamos la preferencia de verdad,
+// pero somos honestos: el CONTENIDO de la app (textos, botones, etc.)
+// todavía está solo en español, así que si eligen otro idioma se lo
+// avisamos con un toast en vez de simular que ya está traducido.
+const LANGUAGES = [
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'Inglés (English)' },
+  { code: 'pt', label: 'Portugués (Português)' },
+  { code: 'fr', label: 'Francés (Français)' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'de', label: 'Alemán (Deutsch)' },
+  { code: 'zh', label: 'Chino (中文)' },
+  { code: 'ja', label: 'Japonés (日本語)' }
+];
+
 function ComingSoonRow({ icon, label }) {
   return (
     <div className="side-menu-row side-menu-row-disabled">
@@ -27,20 +40,18 @@ function ComingSoonRow({ icon, label }) {
   );
 }
 
-// Sección desplegable (Configuración y privacidad / Ayuda y soporte
-// técnico) — mismo patrón que ya existía en SettingsModal.jsx.
-function CollapsibleSection({ icon, title, children }) {
-  const [open, setOpen] = useState(false);
+// Cabecera de cada "pestaña"/sección del menú (todo menos la portada
+// principal): flecha para volver + título. Reemplaza al patrón anterior de
+// acordeón (CollapsibleSection, que expandía la lista ahí mismo) porque el
+// usuario pidió que cada desplegable se abra como una sección propia, no
+// como una ventana emergente ni un expandible en el medio de la lista.
+function PanelHead({ title, onBack }) {
   return (
-    <div className="side-menu-collapsible">
-      <button type="button" className="side-menu-row" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        {icon}
-        <span>{title}</span>
-        <span className={`side-menu-chevron ${open ? 'open' : ''}`}>
-          <IconChevronRight size={16} />
-        </span>
+    <div className="side-menu-panel-head">
+      <button type="button" className="side-menu-back-btn" onClick={onBack} aria-label="Volver">
+        <IconChevronRight size={19} />
       </button>
-      {open && <div className="side-menu-collapsible-body">{children}</div>}
+      <span className="side-menu-panel-title">{title}</span>
     </div>
   );
 }
@@ -52,16 +63,24 @@ function CollapsibleSection({ icon, title, children }) {
 // cuenta) porque separarlas en dos pantallas distintas hoy sería duplicar
 // contenido — se puede separar de verdad más adelante si hace falta. Lo que
 // todavía no existe como funcionalidad real (Chatear con IA, Cumpleaños,
-// Idioma de la app, Ícono de la app, Asistente de ayuda de IA) se ve
-// marcado como "Pronto" en vez de simular que funciona.
+// Ícono de la app, Asistente de ayuda de IA) se ve marcado como "Pronto" en
+// vez de simular que funciona.
+//
+// Navegación: "panel" indica qué "pestaña" se ve — null es la portada
+// principal, y 'settings'/'help'/'language'/'legal' son sub-secciones a
+// pantalla completa (dentro de la tarjeta del menú) con su propio botón de
+// volver, en vez de expandirse en el lugar como antes.
 export default function SideMenu({ onClose, onLogout, onViewProfile, onViewPet, showToast, theme, onThemeChange }) {
   const [me, setMe] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState(null); // null | 'terms' | 'privacy'
-  const [legalPickerOpen, setLegalPickerOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [panel, setPanel] = useState(null); // null | 'settings' | 'help' | 'language' | 'legal'
+  const [language, setLanguage] = useState(() => {
+    try { return localStorage.getItem(LANGUAGE_KEY) || 'es'; } catch { return 'es'; }
+  });
 
   useEffect(() => {
     api.me().then(setMe).catch(() => {});
@@ -78,6 +97,25 @@ export default function SideMenu({ onClose, onLogout, onViewProfile, onViewPet, 
     onLogout();
   }
 
+  function handleLanguageChange(code) {
+    setLanguage(code);
+    try { localStorage.setItem(LANGUAGE_KEY, code); } catch { /* noop */ }
+    if (code === 'es') {
+      showToast('Idioma guardado');
+    } else {
+      showToast('Guardado — por ahora la app se sigue viendo en español, ¡ya estamos trabajando en la traducción!');
+    }
+  }
+
+  // A dónde vuelve cada sección al tocar la flecha de atrás: language y
+  // legal son sub-secciones DENTRO de settings/help, así que vuelven ahí
+  // (no directo a la portada) — un "back" de verdad, no un cierre general.
+  function goBack() {
+    if (panel === 'language') return setPanel('settings');
+    if (panel === 'legal') return setPanel('help');
+    return setPanel(null);
+  }
+
   const pet = me?.pet;
 
   return (
@@ -85,103 +123,163 @@ export default function SideMenu({ onClose, onLogout, onViewProfile, onViewPet, 
       {createPortal(
         <div className="modal-backdrop side-menu-backdrop" onClick={onClose}>
           <div className="side-menu-card" onClick={(e) => e.stopPropagation()}>
-            <div className="side-menu-head">
-              <button type="button" className="side-menu-pet-row" onClick={onViewProfile}>
-                <PetAvatar
-                  photoUrl={pet?.photo_url}
-                  species={pet?.species}
-                  color={pet?.color}
-                  avatarBg={pet?.avatar_bg}
-                  avatarAccessory={pet?.avatar_accessory}
-                  size={44}
-                />
-                <div>
-                  <div className="side-menu-pet-name">{pet?.name || 'Mi perfil'}</div>
-                  <div className="side-menu-pet-sub">Ver tu perfil</div>
+            {panel === null && (
+              <>
+                <div className="side-menu-head">
+                  <button type="button" className="side-menu-pet-row" onClick={onViewProfile}>
+                    <PetAvatar
+                      photoUrl={pet?.photo_url}
+                      species={pet?.species}
+                      color={pet?.color}
+                      avatarBg={pet?.avatar_bg}
+                      avatarAccessory={pet?.avatar_accessory}
+                      avatarVariant={pet?.avatar_variant}
+                      size={44}
+                    />
+                    <div>
+                      <div className="side-menu-pet-name">{pet?.name || 'Mi perfil'}</div>
+                      <div className="side-menu-pet-sub">Ver tu perfil</div>
+                    </div>
+                  </button>
+                  <button type="button" className="modal-close-x" onClick={onClose} aria-label="Cerrar">
+                    <IconClose size={20} />
+                  </button>
                 </div>
-              </button>
-              <button type="button" className="modal-close-x" onClick={onClose} aria-label="Cerrar">
-                <IconClose size={20} />
-              </button>
-            </div>
 
-            <div className="side-menu-section">
-              <button type="button" className="side-menu-row" onClick={() => setFriendsOpen(true)}>
-                <IconUsers size={19} />
-                <span>Amigos</span>
-              </button>
-              <button type="button" className="side-menu-row" onClick={() => setAvatarOpen(true)} disabled={!pet}>
-                <IconFace size={19} />
-                <span>Avatares</span>
-              </button>
-              <ComingSoonRow icon={<IconSparkle size={19} />} label="Chatear con IA" />
-              <ComingSoonRow icon={<IconCake size={19} />} label="Cumpleaños" />
-            </div>
+                <div className="side-menu-section">
+                  <button type="button" className="side-menu-row" onClick={() => setFriendsOpen(true)}>
+                    <IconUsers size={19} />
+                    <span>Amigos</span>
+                  </button>
+                  <button type="button" className="side-menu-row" onClick={() => setAvatarOpen(true)} disabled={!pet}>
+                    <IconFace size={19} />
+                    <span>Avatares</span>
+                  </button>
+                  <ComingSoonRow icon={<IconSparkle size={19} />} label="Chatear con IA" />
+                  <ComingSoonRow icon={<IconCake size={19} />} label="Cumpleaños" />
+                </div>
 
-            <div className="side-menu-section">
-              <CollapsibleSection icon={<IconSettings size={19} />} title="Configuración y privacidad">
-                <button type="button" className="side-menu-row side-menu-subrow" onClick={() => setSettingsOpen(true)}>
-                  <IconSettings size={17} />
-                  <span>Configuración</span>
-                </button>
-                <button type="button" className="side-menu-row side-menu-subrow" onClick={() => setSettingsOpen(true)}>
-                  <IconLock size={17} />
-                  <span>Centro de privacidad</span>
-                </button>
-                <div className="side-menu-row side-menu-subrow side-menu-theme-row">
-                  <IconMoon size={17} />
-                  <span>Modo oscuro</span>
-                  <div className="side-menu-theme-options">
-                    <button type="button" className={theme === 'system' ? 'active' : ''} onClick={() => onThemeChange('system')}>Auto</button>
-                    <button type="button" className={theme === 'light' ? 'active' : ''} onClick={() => onThemeChange('light')}>Claro</button>
-                    <button type="button" className={theme === 'dark' ? 'active' : ''} onClick={() => onThemeChange('dark')}>Oscuro</button>
+                <div className="side-menu-section">
+                  <button type="button" className="side-menu-row" onClick={() => setPanel('settings')}>
+                    <IconSettings size={19} />
+                    <span>Configuración y privacidad</span>
+                    <span className="side-menu-chevron"><IconChevronRight size={16} /></span>
+                  </button>
+                  <button type="button" className="side-menu-row" onClick={() => setPanel('help')}>
+                    <IconHelp size={19} />
+                    <span>Ayuda y soporte técnico</span>
+                    <span className="side-menu-chevron"><IconChevronRight size={16} /></span>
+                  </button>
+                </div>
+
+                <div className="side-menu-section">
+                  <button type="button" className="side-menu-row side-menu-danger" onClick={handleLogout} disabled={loggingOut}>
+                    <IconLogout size={19} />
+                    <span>{loggingOut ? 'Cerrando sesión…' : 'Cerrar sesión'}</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {panel === 'settings' && (
+              <div className="side-menu-panel">
+                <PanelHead title="Configuración y privacidad" onBack={goBack} />
+                <div className="side-menu-section side-menu-section-flush">
+                  <button type="button" className="side-menu-row" onClick={() => setSettingsOpen(true)}>
+                    <IconSettings size={19} />
+                    <span>Configuración</span>
+                  </button>
+                  <button type="button" className="side-menu-row" onClick={() => setSettingsOpen(true)}>
+                    <IconLock size={19} />
+                    <span>Centro de privacidad</span>
+                  </button>
+                  <div className="side-menu-row side-menu-theme-row">
+                    <IconMoon size={19} />
+                    <span>Modo oscuro</span>
+                    <div className="side-menu-theme-options">
+                      <button type="button" className={theme === 'system' ? 'active' : ''} onClick={() => onThemeChange('system')}>Auto</button>
+                      <button type="button" className={theme === 'light' ? 'active' : ''} onClick={() => onThemeChange('light')}>Claro</button>
+                      <button type="button" className={theme === 'dark' ? 'active' : ''} onClick={() => onThemeChange('dark')}>Oscuro</button>
+                    </div>
+                  </div>
+                  <button type="button" className="side-menu-row" onClick={() => setPanel('language')}>
+                    <IconGlobe size={19} />
+                    <span>Idioma de la app</span>
+                    <span className="side-menu-value-badge">{LANGUAGES.find((l) => l.code === language)?.label || 'Español'}</span>
+                    <span className="side-menu-chevron"><IconChevronRight size={16} /></span>
+                  </button>
+                  <div className="side-menu-row side-menu-row-disabled">
+                    <IconAppSquare size={19} />
+                    <span>Ícono de la app</span>
+                    <span className="side-menu-soon-badge">Pronto</span>
                   </div>
                 </div>
-                <div className="side-menu-row side-menu-subrow side-menu-row-disabled">
-                  <IconGlobe size={17} />
-                  <span>Idioma de la app</span>
-                  <span className="side-menu-soon-badge">Español</span>
-                </div>
-                <div className="side-menu-row side-menu-subrow side-menu-row-disabled">
-                  <IconAppSquare size={17} />
-                  <span>Ícono de la app</span>
-                  <span className="side-menu-soon-badge">Pronto</span>
-                </div>
-              </CollapsibleSection>
+              </div>
+            )}
 
-              <CollapsibleSection icon={<IconHelp size={19} />} title="Ayuda y soporte técnico">
-                <div className="side-menu-row side-menu-subrow side-menu-row-disabled">
-                  <IconSparkle size={17} />
-                  <span>Asistente de ayuda de IA</span>
-                  <span className="side-menu-soon-badge">Pronto</span>
+            {panel === 'language' && (
+              <div className="side-menu-panel">
+                <PanelHead title="Idioma de la app" onBack={goBack} />
+                <div className="side-menu-lang-note">
+                  La app todavía se muestra solo en español. Elegí tu idioma preferido igual: guardamos tu elección y te avisamos apenas esté lista la traducción completa.
                 </div>
-                <a className="side-menu-row side-menu-subrow" href={`mailto:${SUPPORT_EMAIL}`}>
-                  <IconHelp size={17} />
-                  <span>Ayuda</span>
-                </a>
-                <a className="side-menu-row side-menu-subrow" href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Reportar un problema en PawPals')}`}>
-                  <IconFlag size={17} />
-                  <span>Reportar un problema</span>
-                </a>
-                <button type="button" className="side-menu-row side-menu-subrow" onClick={() => setLegalPickerOpen((v) => !v)}>
-                  <IconDoc size={17} />
-                  <span>Condiciones y políticas</span>
-                </button>
-                {legalPickerOpen && (
-                  <div className="side-menu-legal-choices">
-                    <button type="button" onClick={() => setLegalOpen('terms')}>Ver Términos y Condiciones</button>
-                    <button type="button" onClick={() => setLegalOpen('privacy')}>Ver Política de Privacidad</button>
+                <div className="side-menu-section side-menu-section-flush">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      className={`side-menu-row side-menu-lang-row ${language === l.code ? 'active' : ''}`}
+                      onClick={() => handleLanguageChange(l.code)}
+                    >
+                      <span>{l.label}</span>
+                      {language === l.code && <span className="side-menu-lang-check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {panel === 'help' && (
+              <div className="side-menu-panel">
+                <PanelHead title="Ayuda y soporte técnico" onBack={goBack} />
+                <div className="side-menu-section side-menu-section-flush">
+                  <div className="side-menu-row side-menu-row-disabled">
+                    <IconSparkle size={19} />
+                    <span>Asistente de ayuda de IA</span>
+                    <span className="side-menu-soon-badge">Pronto</span>
                   </div>
-                )}
-              </CollapsibleSection>
-            </div>
+                  <a className="side-menu-row" href={`mailto:${SUPPORT_EMAIL}`}>
+                    <IconHelp size={19} />
+                    <span>Ayuda</span>
+                  </a>
+                  <a className="side-menu-row" href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Reportar un problema en PawPals')}`}>
+                    <IconFlag size={19} />
+                    <span>Reportar un problema</span>
+                  </a>
+                  <button type="button" className="side-menu-row" onClick={() => setPanel('legal')}>
+                    <IconDoc size={19} />
+                    <span>Condiciones y políticas</span>
+                    <span className="side-menu-chevron"><IconChevronRight size={16} /></span>
+                  </button>
+                </div>
+              </div>
+            )}
 
-            <div className="side-menu-section">
-              <button type="button" className="side-menu-row side-menu-danger" onClick={handleLogout} disabled={loggingOut}>
-                <IconLogout size={19} />
-                <span>{loggingOut ? 'Cerrando sesión…' : 'Cerrar sesión'}</span>
-              </button>
-            </div>
+            {panel === 'legal' && (
+              <div className="side-menu-panel">
+                <PanelHead title="Condiciones y políticas" onBack={goBack} />
+                <div className="side-menu-section side-menu-section-flush">
+                  <button type="button" className="side-menu-row" onClick={() => setLegalOpen('terms')}>
+                    <IconDoc size={19} />
+                    <span>Términos y Condiciones</span>
+                  </button>
+                  <button type="button" className="side-menu-row" onClick={() => setLegalOpen('privacy')}>
+                    <IconLock size={19} />
+                    <span>Política de Privacidad</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>,
         document.body

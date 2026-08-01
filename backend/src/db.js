@@ -193,6 +193,7 @@ ensureColumn('pets', 'cover_path', 'TEXT');
 // real. Se usan sólo cuando la mascota no tiene photo_path (ver PetAvatar).
 ensureColumn('pets', 'avatar_bg', 'TEXT');
 ensureColumn('pets', 'avatar_accessory', 'TEXT');
+ensureColumn('pets', 'avatar_variant', 'TEXT');
 
 function seedIfEmpty() {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

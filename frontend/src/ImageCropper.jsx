@@ -152,13 +152,31 @@ export default function ImageCropper({
     rotation, displayed.w, displayed.h, containerSize.width, containerSize.height, centerEx, centerEy
   );
 
+  // Antes el zoom mínimo era siempre 1 (la foto "tapando" el marco de punta
+  // a punta, sin dejar ver nada fuera de ella) — a pedido del usuario ahora
+  // se puede achicar un poco más, hasta dejar ver la foto ENTERA encuadrada
+  // (con una franja negra pareja en el eje que sobre, como el letterboxing
+  // de un video). Se calcula la relación entre "cubrir" el marco y
+  // "contener" la foto completa para ese tamaño puntual de imagen — cada
+  // foto tiene su propio mínimo según su proporción.
+  function getMinZoom() {
+    if (!natural) return 1;
+    const coverScale = Math.max(containerSize.width / natural.w, containerSize.height / natural.h);
+    const containScale = Math.min(containerSize.width / natural.w, containerSize.height / natural.h);
+    return Math.min(1, containScale / (coverScale * MIN_OVERSCAN));
+  }
+
   function clamp(o, dW, dH) {
-    const minX = Math.min(0, containerSize.width - dW);
-    const minY = Math.min(0, containerSize.height - dH);
-    return {
-      x: Math.max(minX, Math.min(0, o.x)),
-      y: Math.max(minY, Math.min(0, o.y))
-    };
+    // Si la foto (a este zoom) es más chica que el marco en algún eje —
+    // porque la achicaron para verla entera — no hay nada para arrastrar
+    // ahí: la centramos con margen parejo en vez de pegarla a un borde.
+    const x = dW <= containerSize.width
+      ? (containerSize.width - dW) / 2
+      : Math.max(containerSize.width - dW, Math.min(0, o.x));
+    const y = dH <= containerSize.height
+      ? (containerSize.height - dH) / 2
+      : Math.max(containerSize.height - dH, Math.min(0, o.y));
+    return { x, y };
   }
 
   function handleImgLoad(e) {
@@ -216,7 +234,7 @@ export default function ImageCropper({
       const d = dist(pts[0], pts[1]);
       const angle = angleBetween(pts[0], pts[1]);
       const ratio = d / pinchRef.current.startDist;
-      const nextZoom = Math.max(1, Math.min(4, pinchRef.current.startZoom * ratio));
+      const nextZoom = Math.max(getMinZoom(), Math.min(4, pinchRef.current.startZoom * ratio));
       const nextRotation = snapRotation(normalizeAngle(pinchRef.current.startRotation + (angle - pinchRef.current.startAngle)));
       setZoom(nextZoom);
       setRotation(nextRotation);
@@ -251,7 +269,7 @@ export default function ImageCropper({
   // Zoom con rueda/trackpad para quien está en la versión web de escritorio
   // (no tiene pantalla táctil para pellizcar).
   function handleWheel(e) {
-    setZoom((z) => Math.max(1, Math.min(4, z - e.deltaY * 0.0015)));
+    setZoom((z) => Math.max(getMinZoom(), Math.min(4, z - e.deltaY * 0.0015)));
   }
 
   function handleConfirm() {
@@ -263,6 +281,11 @@ export default function ImageCropper({
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
+    // Si la foto quedó achicada (para verla entera encuadrada), el canvas
+    // deja ver de fondo esas franjas — sin esto, el JPEG final las guarda
+    // como negro "sucio"/al azar en vez de un negro prolijo a propósito.
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, targetW, targetH);
     const canvasScale = targetW / containerSize.width;
     if (!rotation) {
       ctx.drawImage(

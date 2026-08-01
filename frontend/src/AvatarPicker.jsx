@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from './api';
-import PetIllustration, { AVATAR_ACCESSORIES, AVATAR_BACKGROUNDS } from './PetIllustration';
+import PetIllustration, { AVATAR_ACCESSORIES, AVATAR_BACKGROUNDS, AVATAR_VARIANTS } from './PetIllustration';
 import { IconClose, IconCheck } from './Icons';
 
 // "Avatares" del menú — pensado en la MISMA IDEA que los avatares
-// personalizables de Duolingo (elegís fondo + accesorio para tu mascota),
-// pero con dibujos 100% propios, no copiados de ahí. Sólo se usa cuando la
-// mascota no tiene foto de perfil real subida (ver PetAvatar): si hay foto,
-// esa foto sigue siendo lo que se muestra.
+// personalizables de Duolingo (elegís el "look" de tu mascota, fondo y
+// accesorio), pero con dibujos 100% propios, no copiados de ahí. Sólo se usa
+// cuando la mascota no tiene foto de perfil real subida (ver PetAvatar): si
+// hay foto, esa foto sigue siendo lo que se muestra.
 export default function AvatarPicker({ pet, onClose, onSaved, showToast }) {
+  const variants = AVATAR_VARIANTS[pet.species] || AVATAR_VARIANTS.dog;
+  const [variant, setVariant] = useState(pet.avatar_variant || variants[0].key);
   const [bg, setBg] = useState(pet.avatar_bg || AVATAR_BACKGROUNDS[0]);
   const [accessory, setAccessory] = useState(pet.avatar_accessory || 'none');
   const [saving, setSaving] = useState(false);
@@ -17,7 +19,7 @@ export default function AvatarPicker({ pet, onClose, onSaved, showToast }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const result = await api.updatePetAvatar({ bg, accessory });
+      const result = await api.updatePetAvatar({ bg, accessory, variant });
       showToast('¡Avatar actualizado!');
       onSaved(result);
     } catch (err) {
@@ -44,7 +46,24 @@ export default function AvatarPicker({ pet, onClose, onSaved, showToast }) {
         )}
 
         <div className="avatar-picker-preview" style={{ background: bg }}>
-          <PetIllustration species={pet.species} size={92} accessory={accessory} />
+          <PetIllustration species={pet.species} variant={variant} size={92} accessory={accessory} />
+        </div>
+
+        <div className="settings-section-title">Look</div>
+        <div className="avatar-picker-accessory-row">
+          {variants.map((v) => (
+            <button
+              type="button"
+              key={v.key}
+              className={`avatar-picker-accessory ${variant === v.key ? 'selected' : ''}`}
+              onClick={() => setVariant(v.key)}
+            >
+              <div className="avatar-picker-accessory-preview" style={{ background: bg }}>
+                <PetIllustration species={pet.species} variant={v.key} size={44} accessory={accessory} />
+              </div>
+              <span>{v.label}</span>
+            </button>
+          ))}
         </div>
 
         <div className="settings-section-title">Fondo</div>
@@ -73,7 +92,7 @@ export default function AvatarPicker({ pet, onClose, onSaved, showToast }) {
               onClick={() => setAccessory(a.key)}
             >
               <div className="avatar-picker-accessory-preview" style={{ background: bg }}>
-                <PetIllustration species={pet.species} size={44} accessory={a.key} />
+                <PetIllustration species={pet.species} variant={variant} size={44} accessory={a.key} />
               </div>
               <span>{a.label}</span>
             </button>
