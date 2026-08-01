@@ -10,12 +10,21 @@
   width:100%;
   max-width:480px;
   height:100vh;
-  height:100dvh;
-  /* Respaldo medido con JS (ver setAppViewportHeight en main.jsx) para los
-     casos de WebKit en modo standalone donde 100dvh no da el alto visible
-     real — si la variable no está seteada, esta línea no hace nada y
-     queda el 100dvh de arriba. */
-  height: var(--app-vh, 100dvh);
+  /* 100lvh ("large viewport height") = el alto asumiendo que la barra de
+     Safari está COLAPSADA/escondida — a propósito, no 100dvh (que se
+     achica cuando la barra de Safari está visible, dejando un hueco
+     reservado del tamaño de esa barra cuando después se esconde al
+     scrollear — esa era la franja gris/blanca que se seguía viendo). Con
+     lvh el contenido ocupa siempre el alto grande de la pantalla, de
+     punta a punta, y la barra de Safari se superpone arriba (translúcida)
+     cuando está visible, en vez de robarle espacio al diseño — igual que
+     cualquier sitio normal (ver Yahoo de referencia). */
+  height:100lvh;
+  /* Respaldo medido con JS (ver setAppViewportHeight en main.jsx, usa
+     window.innerHeight — el alto "grande" también en Safari viejo que no
+     entienda 100lvh) — si la variable no está seteada, no hace nada y
+     queda el 100lvh de arriba. */
+  height: var(--app-vh, 100lvh);
   background:var(--bg);
   display:flex;
   flex-direction:column;

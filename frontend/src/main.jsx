@@ -12,26 +12,28 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
-// Respaldo para el alto real de la pantalla en iOS instalado como PWA.
-// `.phone` usa `height:100dvh` (pensado justo para esto), pero hay
-// versiones/casos de WebKit en modo standalone donde 100dvh no termina de
-// coincidir con el alto visible real — deja una franja del fondo de la
-// página (blanca) asomando abajo, debajo de la barra de navegación, como
-// reportó el usuario incluso con la app recién instalada. Como respaldo
-// medimos el alto real con JS (innerHeight, que en standalone SIEMPRE es
-// el alto visible de verdad) y lo guardamos en una variable CSS que
-// `.phone` usa si está disponible — si el navegador nunca corre este JS
-// (no debería pasar) o dvh ya estaba bien, no cambia nada.
+// Alto real de la pantalla para `.phone` — el diagnóstico anterior (usar
+// visualViewport, que se ACHICA cuando la barra de Safari está visible)
+// estaba mal pensado: eso hace que `.phone` se achique para "no quedar
+// tapado" por la barra de Safari, dejando un hueco reservado (la franja
+// gris que reportó el usuario) cuando esa barra después se esconde al
+// scrollear. Lo que en realidad se quiere (ver captura de Yahoo que mandó
+// de referencia) es lo que hace CUALQUIER sitio normal: el contenido
+// ocupa SIEMPRE el alto grande de la pantalla, de punta a punta, y la
+// barra flotante de Safari se superpone (translúcida) arriba del
+// contenido cuando está visible, sin robarle espacio a nadie.
+//
+// window.innerHeight en iOS Safari es justo eso — el alto "grande" del
+// viewport, el que NO se achica cuando aparece la barra de Safari (a
+// diferencia de visualViewport.height, que sí) — así que sirve como
+// respaldo confiable para navegadores viejos que no soportan `100lvh`
+// (large viewport height, la unidad CSS pensada exactamente para esto).
 function setAppViewportHeight() {
-  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  document.documentElement.style.setProperty('--app-vh', `${h}px`);
+  document.documentElement.style.setProperty('--app-vh', `${window.innerHeight}px`);
 }
 setAppViewportHeight();
 window.addEventListener('resize', setAppViewportHeight);
 window.addEventListener('orientationchange', setAppViewportHeight);
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', setAppViewportHeight);
-}
 
 // El meta viewport (user-scalable=no) no alcanza para bloquear el pellizco
 // para hacer zoom en Safari/iOS moderno: WebKit lo ignora a propósito desde
